@@ -13,3 +13,7 @@ RADII (a nod to the radii and diameters used to size a fibroid) studies the reli
 ## The Dataset
 
 We use the public Uterine Myoma MRI Dataset (UMD), the largest openly available uterine fibroid MRI dataset. It contains sagittal T2-weighted pelvic MRI scans from 300 patients, spanning all fibroid types, each with expert pixel-level segmentation masks that label the uterine wall, cavity, fibroids, and cysts. Because these masks give an exact, traced measurement of every fibroid for free, and let us compute the quick clinical estimate from the same scan, UMD lets us measure the error of the shortcut directly, at scale, without needing to collect or annotate any new data ourselves.
+
+## Related Models
+
+* **VM-UNet:** Implementation and documentation located in [`models/vmunet/`](./models/vmunet/README.md).
