@@ -1,4 +1,8 @@
-# VM-UNet
+# VM-UNet Integration for Project RADII
+
+> **RADII Project Context:** This directory contains the VM-UNet implementation selected for evaluating Vision Mamba (State Space Model) segmentation performance against standard medical imaging baselines.
+
+---
 This is the official code repository for "VM-UNet: Vision Mamba UNet for Medical
 Image Segmentation". {[Arxiv Paper](https://arxiv.org/abs/2402.02491)}
 
