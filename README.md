@@ -8,7 +8,7 @@ An Uncertainty-guided Tiered Self-training Framework for Active Source-free Doma
 
 https://arxiv.org/pdf/2407.02893 
 
-### About the Model Used
+#### About the Model Used in this Paper
 
 This paper uses an ML model called U-Net, which is a type of "neural network mainly used for image segmentation (dividing an image into different parts to identify a specific object)."
 
