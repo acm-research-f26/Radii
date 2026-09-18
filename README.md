@@ -2,22 +2,29 @@
 
 An Uncertainty-guided Tiered Self-training Framework for Active Source-free Domain Adaptation in Prostate Segmentation
 
-
-
 #### Link to Article
 
 https://arxiv.org/pdf/2407.02893 
 
 ### Paper Summary
 
+Uncertainty Guided Tiered Self Training (UGTST) is a framework  for Active Source Free Domain Adaptation (ASFDA) in medical segmentation. 
 
+A segmentation ML model is trained on one hospital's data but needs to adapt to another hospital's data and correctly predict without the original dataset. UGTST adapts the model using only: 
+
+- the pretrained model
+- unlabeled target images
+- M number of labeled images  
+
+Includes Active Sample Section and Tiered Self Training to do so.
+
+Results: With 5% annotation, UGTST achieves dice scores of 9.78% and 7.58%, which is higher than fully supervised training and ASFDA methods.
 
 #### About the Model Used in this Paper
 
 ##### Dataset
 
 This paper uses a model trained on a dataset that is not available to the current programmer. Therefore, the model had to teach itself using a different dataset that was unlabeled by picking the most useful images to learn from and train on them in stages. 
-
 
 ##### Architecture 
 
@@ -35,11 +42,16 @@ Model looks at unlabeled images and gives each a score based on how certain the 
 
 Model also makes predictions on unlabeled data and then trains in stages or tiers on its own confident predictions. Each tier is a less confident prediction level.
 
-##### Components
+##### Key Details
 
-##### Important Details
+The code used Kaiming init
 
 ### Motivation 
+
+The motivation behind this research was clinical practicality. 
+
+- ML models work well within one hospital but struggle to generalize across different hospitals.
+- Source free adaptation was used as hospitals cannot share patient data for privacy reasons
 
 ### Methodology
 
@@ -68,3 +80,7 @@ UGTST Method - Combines existing techniques like uncertainty estimation, active 
 
 
 ### Relation to OA Paper
+
+Medical imaging for ellipsoidal tumors similar to the uterine fibroid. This paper addresses risk classification which may be useful for our research. 
+
+I think we could implement the entropy method that this paper used in order to determine which images to train on. 
