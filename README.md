@@ -44,7 +44,10 @@ Model also makes predictions on unlabeled data and then trains in stages or tier
 
 ##### Key Details
 
-The code used Kaiming init
+- The code used Kaiming init
+- unet.py model is a 2D model
+- layer order: convolution -> norm -> activation -> dropout -> conv -> norm -> activation
+
 
 ### Motivation 
 
