@@ -1,0 +1,20 @@
+# data and model files that were not committed
+
+UMD/
+clean/
+nnUNet_raw/
+nnUNet_preprocessed/
+nnUNet_results/
+*.nii
+*.nii.gz
+*.dcm
+*.pth
+*.zip
+
+# python / environment
+
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
