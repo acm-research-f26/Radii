@@ -8,6 +8,16 @@ repository history); this is my own re-implementation for learning purposes, not
 
 **Status:** training and evaluation are in progress. No results are reported yet. The code has not been fully tested end to end.
 
+## Research Paper Implementation 
+
+We used the following paper's methodology to develop a model and train it on the UMD dataset: 
+
+Bhatia, D. et al. (2026). Real-Time Automated Analysis and Reporting of Uterine MRI. In: Celebi, M.E., et al. Skin Image Analysis, and Computer-Aided Pelvic Imaging for Female Health. DGM4MICCAI 2025. Lecture Notes in Computer Science, vol 16149. Springer, Cham. https://doi.org/10.1007/978-3-032-05825-6_13
+
+UMD dataset:
+ 
+Pan, Haixia; Chen, Minghuang; Bai, Wenpei; Li, Bin; Zhao, Xiaoran; Zhang, Meng; et al. (2023). UMD.zip. figshare. Dataset. https://doi.org/10.6084/m9.figshare.23541312.v3
+
 ## Files
 
 | File | Purpose |
