@@ -1,0 +1,51 @@
+# Automated uterine MRI segmentation, volumetry and reporting (UMD dataset)
+
+Work-in-progress implementation of a pipeline that segments the uterine wall, uterine cavity,
+myomas and Nabothian cysts on T2-weighted sagittal MRI with nnU-Net v2 (3D full-res, ResEnc-M),
+computes per-structure volumes and lesion counts, and writes an HTML report. Based on the
+methodology described in the paper this project follows (see the task description in the
+repository history); this is my own re-implementation for learning purposes, not the authors' code.
+
+**Status:** training and evaluation are in progress. No results are reported yet. The code has not been fully tested end to end.
+
+## Files
+| File | Purpose |
+| `umd_preprocess.py` | Explore, check and clean the UMD dataset (`explore`, `check`, `build`) |
+| `uterine_mri_tool.py` | Dataset prep for nnU-Net, 5-fold inference, volumetry, lesion counting, HTML report, Dice/IoU evaluation |
+| `train_nnunet.sh` | nnU-Net planning (ResEnc-M) and 5-fold training commands |
+| `uterine_umd_notebook.ipynb` | Colab/Kaggle notebook (originally written for the raw UMD zip layout; see notes) |
+
+## Dataset
+Uses the public UMD dataset: Pan et al., "Large-scale uterine myoma MRI dataset covering all FIGO types with pixel-level annotations", *Scientific Data* (2024). The data is **not** included in this repository; download it from the paper's Data Availability section and follow its license.
+
+Quirks of the public release that `umd_preprocess.py` handles:
+- macOS junk files (`__MACOSX`, `._*`, `.DS_Store`)
+- 34 label files named `_seq.nii.gz` instead of `_seg.nii.gz`
+- those label files are uncompressed NIfTI with a `.gz` extension (and one has a typo in its case number)
+- for 33 of those cases, the label affine differs from the image affine; I currently exclude them
+  from training until I confirm the label alignment (267 cases used)
+
+Label values (0 background, 1 wall, 2 cavity, 3 myoma, 4 Nabothian cyst) were inferred from voxel
+statistics and the number of cases with cysts (127), and should be confirmed visually.
+
+## Usage
+```bash
+pip install -r requirements.txt
+
+# 1. clean the dataset
+python umd_preprocess.py build --root path/to/UMD/UMD --out clean
+
+# 2. nnU-Net environment variables, then dataset prep + training
+python uterine_mri_tool.py prepare_dataset --images_dir clean/images --labels_dir clean/labels
+bash train_nnunet.sh
+
+# 3. run the tool on a scan
+python uterine_mri_tool.py run --input scan.nii.gz --output_dir out/
+```
+GPU training in the notebook uses a shortened schedule (`nnUNetTrainer_100epochs`, one fold) because
+the original 5 x 1000 epochs is not practical on free notebook GPUs.
+
+## Not implemented / caveats
+- The real-time scanner streaming (ISMRMRD) step is only a simplified offline stub.
+- The out-of-distribution dataset (Dataset II in the paper) is not public and is not used.
+- The report is for research use only and is not a diagnostic tool
