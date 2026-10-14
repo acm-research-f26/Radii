@@ -1,0 +1,6 @@
+# torch is preinstalled on Colab; install it yourself for local use
+numpy
+scipy
+nibabel>=5
+monai>=1.3
+matplotlib
