@@ -11,7 +11,7 @@ from google.colab import drive
 drive.mount('/content/drive')
 
 DRIVE = '/content/drive/MyDrive/figo'          # shared project folder (one Colab account)
-REPO_URL = 'https://github.com/DeekshaBandi/test.git'  # private repo? use https://<token>@github.com/...
+REPO_URL = 'https://github.com/acm-research-f26/Radii.git'  # public; if made private see README (token in Colab Secrets)
 REPO = '/content/figo-repo'
 
 import os, subprocess
@@ -326,7 +326,7 @@ BATCH = 2
 import glob, os, shutil, subprocess, zipfile
 import torch
 
-REPO_URL = 'https://github.com/DeekshaBandi/test.git'
+REPO_URL = 'https://github.com/acm-research-f26/Radii.git'
 try:
     from kaggle_secrets import UserSecretsClient
     REPO_URL = REPO_URL.replace('https://', f"https://{UserSecretsClient().get_secret('GITHUB_TOKEN')}@")
