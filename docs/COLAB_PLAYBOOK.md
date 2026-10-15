@@ -37,4 +37,12 @@ results/                     <model>_seg.csv / _figo_agreement.csv + .summary.js
 
 | Slot (date, time) | Person | Notebook / model | Epochs done | Notes |
 |---|---|---|---|---|
+| Week 1 | Ira | `00_setup_data` (CPU runtime) | – | Check 300/300 loaded, ~33 mislabeled-gzip segs, spacing ~0.45×0.45×6.6 mm, split 210/30/60 |
+| Week 1 | Purnima | `02_nnunet` smoke test, `VARIANT='3d_fullres'` | | `SMOKE=True`, after 00 is done |
+| Week 1 | Purnima | `02_nnunet` smoke test, `VARIANT='resenc'` | | `SMOKE=True` |
+| Week 1 | Purnima | `01_train_custom_model` smoke test, `MODEL='mednext'` | | `SMOKE=True` |
+| Week 1 | Anagha | Kaggle setup: private dataset from 00, `GITHUB_TOKEN` secret only if the repo goes private | – | |
+| Week 1 | Anagha | `K1_kaggle_train` smoke test, `MODEL='unet3d'` | | `SMOKE=True` |
+| Week 1 | Anagha | `K1_kaggle_train` smoke test, `MODEL='aksunet'` | | `SMOKE=True` |
+| Week 1 | Snigdha | `01_train_custom_model` smoke test, `MODEL='davnet'` | | `SMOKE=True` |
 | | | | | |
