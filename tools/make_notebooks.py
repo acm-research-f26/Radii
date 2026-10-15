@@ -24,6 +24,23 @@ else:
 !pip -q install -r requirements.txt'''
 
 
+TIMING = '''
+# timing -> how many epochs fit the budget (row 1 = pure training, row 2 = training + validation)
+import csv
+log = list(csv.DictReader(open(f'{RUN}/log.csv')))
+for r in log:
+    print('epoch', r['epoch'], r['epoch_sec'], 's')
+if len(log) >= 3:
+    t_train = float(log[1]['epoch_sec'])
+    t_val = max(float(log[2]['epoch_sec']) - t_train, 0)
+    per_epoch = t_train + t_val / 10          # validation runs every 10 epochs
+    print(f'~{per_epoch:.0f} s per epoch on average; validation ~{t_val:.0f} s')
+    for h in (6, 8, 10):
+        print(f'  {h:2d} GPU-hours  ->  EPOCHS = {int(h * 3600 / per_epoch)}')
+!nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv
+'''
+
+
 def nb(cells):
     out = []
     for kind, src in cells:
@@ -111,7 +128,8 @@ resumes. Set `MAX_HOURS` a little below your remaining session so it stops clean
 '''),
     ("code", '''
 MODEL = 'mednext'      # 'unet3d' | 'mednext' | 'davnet' | 'aksunet'
-EPOCHS = 200           # x 250 iterations; capped for benchmarking, keep identical across models
+SMOKE = True           # True: 3-epoch timing run into runs/smoke_<model>. False: the real run
+EPOCHS = 200           # x 250 iterations; set from the smoke-test timing, identical across models
 MAX_HOURS = 3.5
 PATCH = '192 192 16'   # H W D(slices). On OOM: '160 160 16' or BATCH = 1
 BATCH = 2
@@ -121,12 +139,15 @@ BATCH = 2
 !nvidia-smi --query-gpu=name,memory.total --format=csv
 # copy the cache to local disk once per session (fast random access during training)
 !rsync -a {DRIVE}/data/cache_0.9mm/ /content/cache/
-RUN = f'{DRIVE}/runs/{MODEL}'
+RUN = f'{DRIVE}/runs/' + (f'smoke_{MODEL}' if SMOKE else MODEL)
+if SMOKE:
+    EPOCHS = 3
 '''),
     ("code", '''
 !python -m figo.train --model {MODEL} --cache-dir /content/cache --splits {DRIVE}/data/splits.json \\
     --out-dir {RUN} --epochs {EPOCHS} --max-hours {MAX_HOURS} --patch-size {PATCH} --batch-size {BATCH}
 '''),
+    ("code", TIMING),
     ("code", '''
 # learning curves
 import csv, matplotlib.pyplot as plt
@@ -162,7 +183,8 @@ ResEnc **M** is used because it fits a 16 GB T4; ResEnc L/XL need 24 GB+.
 '''),
     ("code", '''
 VARIANT = '3d_fullres'   # '3d_fullres' (nnU-Net default plans) | 'resenc' (nnUNetResEncUNetMPlans)
-EPOCHS = 250             # keep identical for both variants and across sessions
+SMOKE = True             # True: 3-epoch timing run into a separate smoke/ folder. False: the real run
+EPOCHS = 250             # set from the smoke-test timing; identical for both variants and across sessions
 '''),
     ("code", COMMON_SETUP + '''
 !pip -q install nnunetv2'''),
@@ -170,8 +192,8 @@ EPOCHS = 250             # keep identical for both variants and across sessions
 import os
 os.environ['nnUNet_raw'] = '/content/nnUNet_raw'
 os.environ['nnUNet_preprocessed'] = '/content/nnUNet_preprocessed'
-os.environ['nnUNet_results'] = f'{DRIVE}/nnUNet_results'
-os.environ['UMD_NNUNET_EPOCHS'] = str(EPOCHS)
+os.environ['nnUNet_results'] = f'{DRIVE}/smoke/nnUNet_results' if SMOKE else f'{DRIVE}/nnUNet_results'
+os.environ['UMD_NNUNET_EPOCHS'] = '3' if SMOKE else str(EPOCHS)
 PLANS = 'nnUNetPlans' if VARIANT == '3d_fullres' else 'nnUNetResEncUNetMPlans'
 PLANNER = [] if VARIANT == '3d_fullres' else ['-pl', 'nnUNetPlannerResEncM']
 
@@ -180,11 +202,19 @@ PLANNER = [] if VARIANT == '3d_fullres' else ['-pl', 'nnUNetPlannerResEncM']
 !python -m figo.nnunet install-trainer
 '''),
     ("code", '''
+# Preprocessing is CPU work: run up to this cell once on a CPU runtime; it is cached on Drive
+# and later GPU sessions just unpack it (saves GPU units every session).
 import subprocess
 pre = f"/content/nnUNet_preprocessed/Dataset501_UMD/{PLANS}_3d_fullres"
+tar = f"{DRIVE}/nnunet_cache/{PLANS}.tar"
 if not os.path.isdir(pre):
-    subprocess.run(['nnUNetv2_plan_and_preprocess', '-d', '501', '-c', '3d_fullres',
-                    '--verify_dataset_integrity', *PLANNER], check=True)
+    if os.path.exists(tar):
+        !tar -xf {tar} -C /content/nnUNet_preprocessed
+    else:
+        subprocess.run(['nnUNetv2_plan_and_preprocess', '-d', '501', '-c', '3d_fullres',
+                        '--verify_dataset_integrity', *PLANNER], check=True)
+        os.makedirs(f'{DRIVE}/nnunet_cache', exist_ok=True)
+        !tar -cf {tar} -C /content/nnUNet_preprocessed Dataset501_UMD
 !cat /content/nnUNet_preprocessed/Dataset501_UMD/{PLANS}.json | python -c "import json,sys; c=json.load(sys.stdin)['configurations']['3d_fullres']; print('patch', c['patch_size'], 'spacing', c['spacing'], 'batch', c['batch_size'])"
 '''),
     ("code", '''
@@ -192,6 +222,12 @@ fold_dir = f"{os.environ['nnUNet_results']}/Dataset501_UMD/nnUNetTrainer_UMD__{P
 resume = ['--c'] if os.path.exists(f'{fold_dir}/checkpoint_latest.pth') else []
 print('resuming' if resume else 'starting fresh', fold_dir)
 !nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainer_UMD -p {PLANS} {' '.join(resume)}
+'''),
+    ("code", '''
+# timing: nnU-Net logs one "Epoch time" line per epoch (the first is slower: warm-up)
+!grep -h "Epoch time" {fold_dir}/training_log_*.txt
+!nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv
+!nproc
 '''),
     ("markdown", "## Test-set inference and evaluation (after training)"),
     ("code", '''
@@ -206,6 +242,28 @@ RES = f'{DRIVE}/results'
     --splits {DRIVE}/data/splits.json --subset test --out {RES}/{NAME}_figo_agreement.csv
 '''),
 ])
+
+setup["cells"] += nb([
+    ("markdown", '''
+## Optional: publish the prepared data as a private Kaggle dataset (for Kaggle training)
+Get `kaggle.json` from kaggle.com -> Settings -> API -> *Create New Token*, and upload it when asked.
+Then on Kaggle: the dataset's Settings -> Sharing -> add teammates.
+'''),
+    ("code", '''
+!pip -q install kaggle
+import json, shutil
+from google.colab import files
+os.makedirs('/root/.kaggle', exist_ok=True)
+files.upload()                                   # choose kaggle.json
+shutil.move('kaggle.json', '/root/.kaggle/kaggle.json'); os.chmod('/root/.kaggle/kaggle.json', 0o600)
+user = json.load(open('/root/.kaggle/kaggle.json'))['username']
+!rm -rf /content/kaggle_ds && mkdir -p /content/kaggle_ds
+!cp -r {DRIVE}/data/cache_0.9mm {DRIVE}/data/clean {DRIVE}/data/splits.json {DRIVE}/data/manifest.csv /content/kaggle_ds/
+json.dump({"title": "umd-prepared", "id": f"{user}/umd-prepared", "licenses": [{"name": "other"}]},
+          open('/content/kaggle_ds/dataset-metadata.json', 'w'))
+!kaggle datasets create -p /content/kaggle_ds --dir-mode zip    # private by default
+'''),
+])["cells"]
 
 figo = nb([
     ("markdown", '''
@@ -242,7 +300,96 @@ for r in rows[:15]:
 '''),
 ])
 
+kaggle = nb([
+    ("markdown", '''
+# K1 - Train a custom baseline on Kaggle (free GPU, ~30 h/week per person)
+
+**Notebook settings (right panel):** Accelerator -> *GPU T4 x2* (only one is used; same chip as Colab, so
+timings compare). Internet -> *On* (needs a phone-verified Kaggle account). **Add Input** -> the team's
+`umd-prepared` dataset. Private repo? Add-ons -> Secrets -> `GITHUB_TOKEN`.
+
+**Always run with Save Version -> *Save & Run All (Commit)*.** It runs in the background (up to 12 h) and
+keeps `/kaggle/working` as the version's output. An interactive session loses everything when it stops.
+
+**To resume** after a 12 h run: Add Input -> *Notebook Output Files* -> this notebook's latest version,
+then Save & Run All again. The cell below picks up the newest `last.pt` automatically.
+'''),
+    ("code", '''
+MODEL = 'unet3d'       # 'unet3d' | 'aksunet' (or any custom model)
+SMOKE = True           # True: 3-epoch timing run. False: the real run
+EPOCHS = 200           # must equal the Colab custom models' EPOCHS
+MAX_HOURS = 11.0       # Kaggle stops sessions at 12 h; leave time to save outputs
+PATCH = '192 192 16'
+BATCH = 2
+'''),
+    ("code", '''
+import glob, os, shutil, subprocess, zipfile
+import torch
+
+REPO_URL = 'https://github.com/DeekshaBandi/test.git'
+try:
+    from kaggle_secrets import UserSecretsClient
+    REPO_URL = REPO_URL.replace('https://', f"https://{UserSecretsClient().get_secret('GITHUB_TOKEN')}@")
+except Exception:
+    pass  # public repo
+REPO = '/tmp/figo-repo'
+if not os.path.exists(REPO):
+    subprocess.run(['git', 'clone', '-q', REPO_URL, REPO], check=True)
+%cd {REPO}
+!pip -q install -r requirements.txt
+
+def locate(name):
+    """Find a file/folder from the input dataset; unzip it if Kaggle kept it as a .zip."""
+    hits = glob.glob(f'/kaggle/input/**/{name}', recursive=True)
+    if hits:
+        return hits[0]
+    zips = glob.glob(f'/kaggle/input/**/{name}.zip', recursive=True)
+    if not zips:
+        raise FileNotFoundError(f'{name} not found - did you add the umd-prepared dataset as input?')
+    dst = f'/tmp/data/{name}'
+    if not os.path.exists(dst):
+        zipfile.ZipFile(zips[0]).extractall(dst)
+    inner = glob.glob(f'{dst}/**/{name}', recursive=True)   # zip may contain the folder itself
+    return inner[0] if inner and os.path.isdir(inner[0]) else dst
+
+SPLITS, CACHE, CLEAN = locate('splits.json'), locate('cache_0.9mm'), locate('clean')
+print(SPLITS, CACHE, CLEAN, len(os.listdir(CACHE)), 'cached volumes')
+
+OUT = '/kaggle/working'
+RUN = f'{OUT}/runs/' + (f'smoke_{MODEL}' if SMOKE else MODEL)
+if SMOKE:
+    EPOCHS = 3
+# resume: copy the most advanced previous run attached as input
+prev = glob.glob(f'/kaggle/input/**/runs/{os.path.basename(RUN)}/last.pt', recursive=True)
+if prev and not os.path.exists(f'{RUN}/last.pt'):
+    best = max(prev, key=lambda p: torch.load(p, map_location='cpu', weights_only=False)['epoch'])
+    shutil.copytree(os.path.dirname(best), RUN, dirs_exist_ok=True)
+    print('resuming from', best)
+!nvidia-smi --query-gpu=name,memory.total --format=csv
+'''),
+    ("code", '''
+!python -m figo.train --model {MODEL} --cache-dir {CACHE} --splits {SPLITS} --out-dir {RUN} \\
+    --epochs {EPOCHS} --max-hours {MAX_HOURS} --patch-size {PATCH} --batch-size {BATCH} --workers 3
+'''),
+    ("code", TIMING),
+    ("markdown", "## Test-set inference and evaluation (in the run where training finishes)"),
+    ("code", '''
+import json
+done = torch.load(f'{RUN}/last.pt', map_location='cpu', weights_only=False)['epoch'] + 1 >= EPOCHS
+if done and not SMOKE:
+    PRED, RES = f'{OUT}/preds/{MODEL}', f'{OUT}/results'
+    !python -m figo.infer --checkpoint {RUN}/best.pt --data-dir {CLEAN} --splits {SPLITS} --subset test --out-dir {PRED}
+    !python -m figo.evaluate --pred-dir {PRED} --data-dir {CLEAN} --splits {SPLITS} --subset test --out {RES}/{MODEL}_seg.csv
+    !python -m figo.figo_eval agreement --ref-dir {CLEAN} --pred-dir {PRED} --splits {SPLITS} --subset test \\
+        --out {RES}/{MODEL}_figo_agreement.csv
+    print("Download this version's output and copy preds/ and results/ into MyDrive/figo/ for model selection.")
+else:
+    print('Training not finished yet - attach this output as input and Save & Run All again.')
+'''),
+])
+
 for name, book in [("00_setup_data.ipynb", setup), ("01_train_custom_model.ipynb", train),
-                   ("02_nnunet.ipynb", nnunet), ("03_select_and_figo.ipynb", figo)]:
+                   ("02_nnunet.ipynb", nnunet), ("03_select_and_figo.ipynb", figo),
+                   ("K1_kaggle_train.ipynb", kaggle)]:
     (OUT / name).write_text(json.dumps(book, indent=1) + "\n")
     print("wrote", OUT / name)
