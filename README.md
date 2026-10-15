@@ -1,5 +1,34 @@
 # Automated FIGO classification of uterine fibroids from MRI
 
+## Start here
+
+**First notebook (Ira):** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/acm-research-f26/Radii/blob/main/notebooks/00_setup_data.ipynb) on a **CPU runtime** (Runtime → Change runtime type → CPU). It needs no GPU.
+
+**Prerequisites**
+- Download `UMD.zip` from Figshare (link in the UMD *Scientific Data* 2024 descriptor) and upload it to `MyDrive/figo/UMD.zip`.
+- Share the `MyDrive/figo/` folder with the second Colab account (Editor access), so both accounts read and write the same data and checkpoints.
+
+**Run order:** `00` → `01` / `02` / `K1` (in parallel, one GPU session at a time per account) → `03`
+
+| Person | Owns |
+|---|---|
+| Ira | `00_setup_data` + nnU-Net 3d_fullres (`02_nnunet`, `VARIANT = '3d_fullres'`) |
+| Purnima | nnU-Net ResEnc (`02_nnunet`, `VARIANT = 'resenc'`) + MedNeXt (`01_train_custom_model`, `MODEL = 'mednext'`) |
+| Anagha | U-Net + AKS-UNet on Kaggle (`K1_kaggle_train`, `MODEL = 'unet3d'` / `'aksunet'`) |
+| Snigdha | DA-VNet (`01_train_custom_model`, `MODEL = 'davnet'`) + FIGO validation plan (`03_select_and_figo`) |
+
+**A successful `00` run prints**
+- `Loaded 300/300 cases; 0 failures`
+- about **33** segmentation files reported as uncompressed despite `.gz` (mislabeled gzip, handled automatically)
+- most common spacing about **0.45 × 0.45 × 6.6 mm**
+- `Split sizes: train 210, val 30, test 60`
+
+If any of these is off, stop and post the output in the team chat before anyone starts training. `data/splits.json` is then fixed for the whole project.
+
+Team rules are in [`CLAUDE.md`](CLAUDE.md), and the GPU schedule is in [`docs/COLAB_PLAYBOOK.md`](docs/COLAB_PLAYBOOK.md).
+
+## Overview
+
 This is a three-stage pipeline on the UMD dataset (300 sagittal T2w pelvic MRIs):
 
 1. **Segment** the uterine wall, cavity, fibroids and nabothian cysts (`figo.train`, `figo.infer`, nnU-Net).
@@ -13,15 +42,19 @@ The full project brief is in [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md), a
 
 ## Running on Colab
 
-| Notebook | Runtime | What it does |
-|---|---|---|
-| `notebooks/00_setup_data.ipynb` | CPU, once | Loads all 300 cases, writes a manifest, the fixed split and the training cache to Drive |
-| `notebooks/01_train_custom_model.ipynb` | T4 | Trains, then tests U-Net / MedNeXt / DA-VNet / AKS-UNet (set `MODEL`) |
-| `notebooks/02_nnunet.ipynb` | T4 | Trains, then tests nnU-Net v2 3d_fullres or ResEnc M (set `VARIANT`) |
-| `notebooks/03_select_and_figo.ipynb` | CPU | Ranks the models, runs Stage 2/3 and the FIGO distribution check |
+| Notebook | Open | Runtime | What it does |
+|---|---|---|---|
+| `notebooks/00_setup_data.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/acm-research-f26/Radii/blob/main/notebooks/00_setup_data.ipynb) | CPU, once | Loads all 300 cases, writes a manifest, the fixed split and the training cache to Drive |
+| `notebooks/01_train_custom_model.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/acm-research-f26/Radii/blob/main/notebooks/01_train_custom_model.ipynb) | T4 | Trains, then tests U-Net / MedNeXt / DA-VNet / AKS-UNet (set `MODEL`) |
+| `notebooks/02_nnunet.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/acm-research-f26/Radii/blob/main/notebooks/02_nnunet.ipynb) | T4 | Trains, then tests nnU-Net v2 3d_fullres or ResEnc M (set `VARIANT`) |
+| `notebooks/03_select_and_figo.ipynb` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/acm-research-f26/Radii/blob/main/notebooks/03_select_and_figo.ipynb) | CPU | Ranks the models, runs Stage 2/3 and the FIGO distribution check |
+| `notebooks/K1_kaggle_train.ipynb` | Kaggle (import the notebook from GitHub) | Kaggle T4/P100 | Free-GPU training of the custom models with resume across 12 h sessions (set `MODEL`) |
 
 Every training run checkpoints to Drive, so after a disconnect you just re-run the notebook and it resumes.
-If the repo is private, put a GitHub token in `REPO_URL` in the setup cell.
+The repo is public, so the notebooks clone it without a token. If it is ever made private, create a
+fine-grained, **read-only** GitHub token (Contents: read, this repo only) and store it as `GITHUB_TOKEN` in
+**Colab Secrets** (key icon in the sidebar) or **Kaggle Secrets** (Add-ons → Secrets). Never paste a token into a
+notebook cell; notebooks get shared and committed.
 
 ## Stage 1 baselines
 

@@ -15,6 +15,11 @@ REPO_URL = 'https://github.com/acm-research-f26/Radii.git'  # public; if made pr
 REPO = '/content/figo-repo'
 
 import os, subprocess
+try:  # private repo: read-only token stored as GITHUB_TOKEN in Colab Secrets
+    from google.colab import userdata
+    REPO_URL = REPO_URL.replace('https://', f"https://{userdata.get('GITHUB_TOKEN')}@")
+except Exception:
+    pass  # public repo
 os.makedirs(DRIVE, exist_ok=True)
 if not os.path.exists(REPO):
     subprocess.run(['git', 'clone', '-q', REPO_URL, REPO], check=True)
