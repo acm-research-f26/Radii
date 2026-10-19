@@ -61,6 +61,7 @@ class FigoRules:
     pedunculated_max_tissue_frac: float = 0.10  # myometrial contact below this -> type 0 / 7
     endometrium_tol_mm: float = 1.0  # within this distance of the cavity -> "abuts endometrium" (3 vs 4)
     cervical_min_cyst_frac: float = 0.10
+    intramural_cut: float = 0.50  # FIGO 50% intramural cut-off (1 vs 2, 5 vs 6, hybrid sides)
     min_volume_mm3: float = 50.0
 
 
@@ -97,8 +98,8 @@ def _apply_rules(f_cav, f_tis, f_out, f_cyst, dist_cav, rules: FigoRules):
         flags.append("near_2_vs_3_threshold")
 
     if sub and ser:
-        x = "1" if f_cav > 0.5 else "2"
-        y = "6" if f_out > 0.5 else "5"
+        x = "1" if f_cav > rules.intramural_cut else "2"
+        y = "6" if f_out > rules.intramural_cut else "5"
         return f"{x}-{y}", (f"hybrid: {pct(f_cav)} of surface in cavity and {pct(f_out)} outside the serosa"), flags
 
     if sub:
@@ -106,10 +107,10 @@ def _apply_rules(f_cav, f_tis, f_out, f_cyst, dist_cav, rules: FigoRules):
         if f_tis < rules.pedunculated_max_tissue_frac:
             figo, why = "0", f"only {pct(f_tis)} myometrial contact -> intracavitary/pedunculated"
         else:
-            figo = "2" if intramural >= 0.5 else "1"
+            figo = "2" if intramural >= rules.intramural_cut else "1"
             why = f"contacts cavity ({pct(f_cav)} of surface); intramural ~{pct(intramural)} " + (
                 ">= 50%" if figo == "2" else "< 50%")
-        if abs(intramural - 0.5) < 0.1:
+        if abs(intramural - rules.intramural_cut) < 0.1:
             flags.append("borderline_50pct")
         return figo, why, flags
 
@@ -118,10 +119,10 @@ def _apply_rules(f_cav, f_tis, f_out, f_cyst, dist_cav, rules: FigoRules):
         if f_tis < rules.pedunculated_max_tissue_frac:
             figo, why = "7", f"only {pct(f_tis)} myometrial contact -> subserosal pedunculated"
         else:
-            figo = "5" if intramural >= 0.5 else "6"
+            figo = "5" if intramural >= rules.intramural_cut else "6"
             why = f"touches serosa ({pct(f_out)} of surface outside); intramural ~{pct(intramural)} " + (
                 ">= 50%" if figo == "5" else "< 50%")
-        if abs(intramural - 0.5) < 0.1:
+        if abs(intramural - rules.intramural_cut) < 0.1:
             flags.append("borderline_50pct")
         return figo, why, flags
 
