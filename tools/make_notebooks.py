@@ -192,7 +192,7 @@ SMOKE = True             # True: 3-epoch timing run into a separate smoke/ folde
 EPOCHS = 250             # set from the smoke-test timing; identical for both variants and across sessions
 '''),
     ("code", COMMON_SETUP + '''
-!pip -q install nnunetv2'''),
+!pip -q install 'nnunetv2>=2.5'  # nnUNetTrainer_UMD matches the >=2.5 __init__ signature'''),
     ("code", '''
 import os
 os.environ['nnUNet_raw'] = '/content/nnUNet_raw'

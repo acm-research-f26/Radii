@@ -11,11 +11,14 @@ Differences from the stock nnUNetTrainer:
 
 import os
 
+import torch
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 
 
 class nnUNetTrainer_UMD(nnUNetTrainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    # explicit signature: nnU-Net >= 2.5 reads the argument names via inspect.signature
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device("cuda")):
+        super().__init__(plans, configuration, fold, dataset_json, device)
         self.num_epochs = int(os.environ.get("UMD_NNUNET_EPOCHS", 250))
         self.save_every = 5
