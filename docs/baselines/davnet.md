@@ -49,6 +49,9 @@ No cavity predicted in 2 cases, no myoma in 4.
 single label). Our multi-label UMD run reaches 0.848 on the whole uterus but 0.537 on fibroids, mostly because about
 half the (small) fibroids are missed.
 
+## Kaggle run log
+Full log from the Kaggle run (every epoch, then the val score block): [`davnet_kaggle_train.log`](kaggle_logs/davnet_kaggle_train.log), [`davnet_kaggle_val.log`](kaggle_logs/davnet_kaggle_val.log).
+
 ## Reproduce
 Kaggle notebook from `notebooks/K1_kaggle_train.ipynb` with the settings above, input `umd-prepared`, GPU T4,
 Internet on, **Save Version → Save & Run All**. Last cell with `--subset val` and `results_val`. Outputs on Drive:

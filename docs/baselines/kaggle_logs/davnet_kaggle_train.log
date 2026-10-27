@@ -1,0 +1,172 @@
+# DA-VNet: Baseline Implementation - training log
+# Source: Kaggle notebook154b9e0662, version 1, GPU T4 x2 (Save & Run All commit). Debugger/pip/nbconvert noise removed; lines otherwise verbatim.
+
+# Settings: MODEL='davnet' SMOKE=False EPOCHS=150 MAX_HOURS=11.0 PATCH='192 192 16' BATCH=2
+
+/kaggle/input/datasets/anaghathota/umd-prepared/splits.json /kaggle/input/datasets/anaghathota/umd-prepared/cache_0.9mm /kaggle/input/datasets/anaghathota/umd-prepared/clean 300 cached volumes
+name, memory.total [MiB]
+Tesla T4, 15360 MiB
+Tesla T4, 15360 MiB
+Loading 210 training volumes ...
+davnet: 24.8M parameters, deep supervision=True
+epoch=0 lr=1.00e-02 train_loss=1.2710 epoch_sec=84
+epoch=1 lr=9.94e-03 train_loss=1.1339 epoch_sec=86
+epoch=2 lr=9.88e-03 train_loss=1.0708 epoch_sec=86
+epoch=3 lr=9.82e-03 train_loss=1.0520 epoch_sec=86
+epoch=4 lr=9.76e-03 train_loss=1.0355 epoch_sec=86
+epoch=5 lr=9.70e-03 train_loss=0.9875 epoch_sec=86
+epoch=6 lr=9.64e-03 train_loss=0.9340 epoch_sec=86
+epoch=7 lr=9.58e-03 train_loss=0.8790 epoch_sec=86
+epoch=8 lr=9.52e-03 train_loss=0.8753 epoch_sec=86
+epoch=9 lr=9.46e-03 train_loss=0.8353 val_wall=0.4670 val_cavity=0.3422 val_myoma=0.1416 val_cyst=0.0000 val_mean=0.2377 val_ema=0.2377 epoch_sec=155
+epoch=10 lr=9.40e-03 train_loss=0.8320 epoch_sec=86
+epoch=11 lr=9.34e-03 train_loss=0.8073 epoch_sec=86
+epoch=12 lr=9.28e-03 train_loss=0.7771 epoch_sec=86
+epoch=13 lr=9.22e-03 train_loss=0.7750 epoch_sec=86
+epoch=14 lr=9.16e-03 train_loss=0.7145 epoch_sec=86
+epoch=15 lr=9.10e-03 train_loss=0.7483 epoch_sec=86
+epoch=16 lr=9.03e-03 train_loss=0.6949 epoch_sec=86
+epoch=17 lr=8.97e-03 train_loss=0.7078 epoch_sec=86
+epoch=18 lr=8.91e-03 train_loss=0.6691 epoch_sec=86
+epoch=19 lr=8.85e-03 train_loss=0.6506 val_wall=0.6500 val_cavity=0.5515 val_myoma=0.3044 val_cyst=0.0000 val_mean=0.3765 val_ema=0.2655 epoch_sec=111
+epoch=20 lr=8.79e-03 train_loss=0.6346 epoch_sec=86
+epoch=21 lr=8.73e-03 train_loss=0.6418 epoch_sec=86
+epoch=22 lr=8.67e-03 train_loss=0.6528 epoch_sec=86
+epoch=23 lr=8.61e-03 train_loss=0.6260 epoch_sec=86
+epoch=24 lr=8.55e-03 train_loss=0.6061 epoch_sec=86
+epoch=25 lr=8.49e-03 train_loss=0.6004 epoch_sec=86
+epoch=26 lr=8.43e-03 train_loss=0.6276 epoch_sec=86
+epoch=27 lr=8.36e-03 train_loss=0.6184 epoch_sec=86
+epoch=28 lr=8.30e-03 train_loss=0.5832 epoch_sec=86
+epoch=29 lr=8.24e-03 train_loss=0.5742 val_wall=0.6767 val_cavity=0.5566 val_myoma=0.3544 val_cyst=0.0810 val_mean=0.4172 val_ema=0.2958 epoch_sec=112
+epoch=30 lr=8.18e-03 train_loss=0.5606 epoch_sec=86
+epoch=31 lr=8.12e-03 train_loss=0.5673 epoch_sec=86
+epoch=32 lr=8.06e-03 train_loss=0.5435 epoch_sec=86
+epoch=33 lr=8.00e-03 train_loss=0.5423 epoch_sec=86
+epoch=34 lr=7.93e-03 train_loss=0.5348 epoch_sec=86
+epoch=35 lr=7.87e-03 train_loss=0.5295 epoch_sec=86
+epoch=36 lr=7.81e-03 train_loss=0.5279 epoch_sec=86
+epoch=37 lr=7.75e-03 train_loss=0.5077 epoch_sec=86
+epoch=38 lr=7.69e-03 train_loss=0.5112 epoch_sec=86
+epoch=39 lr=7.63e-03 train_loss=0.5119 val_wall=0.7071 val_cavity=0.6086 val_myoma=0.4418 val_cyst=0.1488 val_mean=0.4766 val_ema=0.3320 epoch_sec=111
+epoch=40 lr=7.56e-03 train_loss=0.5164 epoch_sec=86
+epoch=41 lr=7.50e-03 train_loss=0.5003 epoch_sec=86
+epoch=42 lr=7.44e-03 train_loss=0.4887 epoch_sec=86
+epoch=43 lr=7.38e-03 train_loss=0.4905 epoch_sec=86
+epoch=44 lr=7.32e-03 train_loss=0.5058 epoch_sec=86
+epoch=45 lr=7.25e-03 train_loss=0.4757 epoch_sec=86
+epoch=46 lr=7.19e-03 train_loss=0.4566 epoch_sec=86
+epoch=47 lr=7.13e-03 train_loss=0.4835 epoch_sec=86
+epoch=48 lr=7.07e-03 train_loss=0.4567 epoch_sec=86
+epoch=49 lr=7.00e-03 train_loss=0.4593 val_wall=0.7344 val_cavity=0.6085 val_myoma=0.4428 val_cyst=0.1861 val_mean=0.4929 val_ema=0.3642 epoch_sec=111
+epoch=50 lr=6.94e-03 train_loss=0.4475 epoch_sec=86
+epoch=51 lr=6.88e-03 train_loss=0.4376 epoch_sec=86
+epoch=52 lr=6.82e-03 train_loss=0.4585 epoch_sec=86
+epoch=53 lr=6.75e-03 train_loss=0.4703 epoch_sec=86
+epoch=54 lr=6.69e-03 train_loss=0.4739 epoch_sec=86
+epoch=55 lr=6.63e-03 train_loss=0.4490 epoch_sec=86
+epoch=56 lr=6.57e-03 train_loss=0.4382 epoch_sec=86
+epoch=57 lr=6.50e-03 train_loss=0.4314 epoch_sec=86
+epoch=58 lr=6.44e-03 train_loss=0.4251 epoch_sec=86
+epoch=59 lr=6.38e-03 train_loss=0.4378 val_wall=0.7322 val_cavity=0.6264 val_myoma=0.4360 val_cyst=0.1838 val_mean=0.4946 val_ema=0.3902 epoch_sec=112
+epoch=60 lr=6.31e-03 train_loss=0.4323 epoch_sec=86
+epoch=61 lr=6.25e-03 train_loss=0.4540 epoch_sec=86
+epoch=62 lr=6.19e-03 train_loss=0.4445 epoch_sec=86
+epoch=63 lr=6.12e-03 train_loss=0.4591 epoch_sec=86
+epoch=64 lr=6.06e-03 train_loss=0.4812 epoch_sec=86
+epoch=65 lr=6.00e-03 train_loss=0.4391 epoch_sec=86
+epoch=66 lr=5.93e-03 train_loss=0.4218 epoch_sec=86
+epoch=67 lr=5.87e-03 train_loss=0.4180 epoch_sec=86
+epoch=68 lr=5.81e-03 train_loss=0.4497 epoch_sec=86
+epoch=69 lr=5.74e-03 train_loss=0.4160 val_wall=0.7382 val_cavity=0.6025 val_myoma=0.4303 val_cyst=0.1409 val_mean=0.4780 val_ema=0.4078 epoch_sec=111
+epoch=70 lr=5.68e-03 train_loss=0.4097 epoch_sec=86
+epoch=71 lr=5.62e-03 train_loss=0.4123 epoch_sec=86
+epoch=72 lr=5.55e-03 train_loss=0.4076 epoch_sec=86
+epoch=73 lr=5.49e-03 train_loss=0.4113 epoch_sec=86
+epoch=74 lr=5.42e-03 train_loss=0.4235 epoch_sec=86
+epoch=75 lr=5.36e-03 train_loss=0.4266 epoch_sec=86
+epoch=76 lr=5.29e-03 train_loss=0.3988 epoch_sec=86
+epoch=77 lr=5.23e-03 train_loss=0.3934 epoch_sec=86
+epoch=78 lr=5.17e-03 train_loss=0.3826 epoch_sec=86
+epoch=79 lr=5.10e-03 train_loss=0.4152 val_wall=0.7226 val_cavity=0.6160 val_myoma=0.4164 val_cyst=0.1397 val_mean=0.4737 val_ema=0.4210 epoch_sec=112
+epoch=80 lr=5.04e-03 train_loss=0.4221 epoch_sec=86
+epoch=81 lr=4.97e-03 train_loss=0.4232 epoch_sec=86
+epoch=82 lr=4.91e-03 train_loss=0.4076 epoch_sec=86
+epoch=83 lr=4.84e-03 train_loss=0.3844 epoch_sec=86
+epoch=84 lr=4.78e-03 train_loss=0.4037 epoch_sec=86
+epoch=85 lr=4.71e-03 train_loss=0.4081 epoch_sec=86
+epoch=86 lr=4.65e-03 train_loss=0.4058 epoch_sec=86
+epoch=87 lr=4.58e-03 train_loss=0.4109 epoch_sec=86
+epoch=88 lr=4.52e-03 train_loss=0.4155 epoch_sec=86
+epoch=89 lr=4.45e-03 train_loss=0.3979 val_wall=0.7729 val_cavity=0.6350 val_myoma=0.5041 val_cyst=0.0000 val_mean=0.4780 val_ema=0.4324 epoch_sec=111
+epoch=90 lr=4.38e-03 train_loss=0.3863 epoch_sec=86
+epoch=91 lr=4.32e-03 train_loss=0.3767 epoch_sec=86
+epoch=92 lr=4.25e-03 train_loss=0.3909 epoch_sec=86
+epoch=93 lr=4.19e-03 train_loss=0.4367 epoch_sec=86
+epoch=94 lr=4.12e-03 train_loss=0.4203 epoch_sec=86
+epoch=95 lr=4.05e-03 train_loss=0.4010 epoch_sec=86
+epoch=96 lr=3.99e-03 train_loss=0.4262 epoch_sec=86
+epoch=97 lr=3.92e-03 train_loss=0.3823 epoch_sec=86
+epoch=98 lr=3.85e-03 train_loss=0.3689 epoch_sec=86
+epoch=99 lr=3.79e-03 train_loss=0.3590 val_wall=0.7078 val_cavity=0.5908 val_myoma=0.4293 val_cyst=0.2498 val_mean=0.4944 val_ema=0.4448 epoch_sec=111
+epoch=100 lr=3.72e-03 train_loss=0.3705 epoch_sec=86
+epoch=101 lr=3.65e-03 train_loss=0.3838 epoch_sec=86
+epoch=102 lr=3.59e-03 train_loss=0.4024 epoch_sec=86
+epoch=103 lr=3.52e-03 train_loss=0.3714 epoch_sec=86
+epoch=104 lr=3.45e-03 train_loss=0.3719 epoch_sec=86
+epoch=105 lr=3.38e-03 train_loss=0.3580 epoch_sec=86
+epoch=106 lr=3.32e-03 train_loss=0.3531 epoch_sec=86
+epoch=107 lr=3.25e-03 train_loss=0.3867 epoch_sec=86
+epoch=108 lr=3.18e-03 train_loss=0.3708 epoch_sec=86
+epoch=109 lr=3.11e-03 train_loss=0.3510 val_wall=0.7837 val_cavity=0.6316 val_myoma=0.4752 val_cyst=0.2734 val_mean=0.5410 val_ema=0.4640 epoch_sec=111
+epoch=110 lr=3.04e-03 train_loss=0.3510 epoch_sec=86
+epoch=111 lr=2.97e-03 train_loss=0.3627 epoch_sec=86
+epoch=112 lr=2.91e-03 train_loss=0.3853 epoch_sec=86
+epoch=113 lr=2.84e-03 train_loss=0.3596 epoch_sec=86
+epoch=114 lr=2.77e-03 train_loss=0.3672 epoch_sec=86
+epoch=115 lr=2.70e-03 train_loss=0.3771 epoch_sec=86
+epoch=116 lr=2.63e-03 train_loss=0.3531 epoch_sec=86
+epoch=117 lr=2.56e-03 train_loss=0.3553 epoch_sec=86
+epoch=118 lr=2.49e-03 train_loss=0.3386 epoch_sec=86
+epoch=119 lr=2.42e-03 train_loss=0.3517 val_wall=0.7729 val_cavity=0.6532 val_myoma=0.5023 val_cyst=0.2181 val_mean=0.5366 val_ema=0.4785 epoch_sec=111
+epoch=120 lr=2.35e-03 train_loss=0.3387 epoch_sec=86
+epoch=121 lr=2.28e-03 train_loss=0.3475 epoch_sec=86
+epoch=122 lr=2.21e-03 train_loss=0.3484 epoch_sec=86
+epoch=123 lr=2.14e-03 train_loss=0.3486 epoch_sec=86
+epoch=124 lr=2.07e-03 train_loss=0.3412 epoch_sec=86
+epoch=125 lr=1.99e-03 train_loss=0.3719 epoch_sec=86
+epoch=126 lr=1.92e-03 train_loss=0.3341 epoch_sec=86
+epoch=127 lr=1.85e-03 train_loss=0.3474 epoch_sec=86
+epoch=128 lr=1.78e-03 train_loss=0.3280 epoch_sec=86
+epoch=129 lr=1.70e-03 train_loss=0.3528 val_wall=0.7634 val_cavity=0.5890 val_myoma=0.4827 val_cyst=0.0832 val_mean=0.4796 val_ema=0.4787 epoch_sec=111
+epoch=130 lr=1.63e-03 train_loss=0.3541 epoch_sec=86
+epoch=131 lr=1.56e-03 train_loss=0.3391 epoch_sec=86
+epoch=132 lr=1.48e-03 train_loss=0.3376 epoch_sec=86
+epoch=133 lr=1.41e-03 train_loss=0.3250 epoch_sec=86
+epoch=134 lr=1.33e-03 train_loss=0.3160 epoch_sec=86
+epoch=135 lr=1.26e-03 train_loss=0.3247 epoch_sec=86
+epoch=136 lr=1.18e-03 train_loss=0.3211 epoch_sec=86
+epoch=137 lr=1.11e-03 train_loss=0.3013 epoch_sec=86
+epoch=138 lr=1.03e-03 train_loss=0.3052 epoch_sec=86
+epoch=139 lr=9.52e-04 train_loss=0.3031 val_wall=0.7903 val_cavity=0.6597 val_myoma=0.5056 val_cyst=0.2974 val_mean=0.5632 val_ema=0.4956 epoch_sec=111
+epoch=140 lr=8.74e-04 train_loss=0.3106 epoch_sec=86
+epoch=141 lr=7.95e-04 train_loss=0.3172 epoch_sec=86
+epoch=142 lr=7.15e-04 train_loss=0.2942 epoch_sec=86
+epoch=143 lr=6.34e-04 train_loss=0.3018 epoch_sec=86
+epoch=144 lr=5.52e-04 train_loss=0.2964 epoch_sec=86
+epoch=145 lr=4.68e-04 train_loss=0.2945 epoch_sec=86
+epoch=146 lr=3.83e-04 train_loss=0.3058 epoch_sec=86
+epoch=147 lr=2.96e-04 train_loss=0.2968 epoch_sec=86
+epoch=148 lr=2.05e-04 train_loss=0.2948 epoch_sec=86
+epoch=149 lr=1.10e-04 train_loss=0.2886 val_wall=0.7815 val_cavity=0.6536 val_myoma=0.5355 val_cyst=0.2651 val_mean=0.5589 val_ema=0.5083 epoch_sec=111
+Done. Best smoothed val Dice 0.5083
+~86 s per epoch on average; validation ~0 s
+   6 GPU-hours  ->  EPOCHS = 251
+   8 GPU-hours  ->  EPOCHS = 334
+  10 GPU-hours  ->  EPOCHS = 418
+name, memory.used [MiB], memory.total [MiB]
+Tesla T4, 0 MiB, 15360 MiB
+Tesla T4, 0 MiB, 15360 MiB
+
+# The val-scoring cell then failed with FileNotFoundError (Kaggle unpacked .nii.gz -> .nii);
+# scoring was rerun in a separate notebook - see davnet_kaggle_val.log. Fixed in figo.io.resolve_nifti.
