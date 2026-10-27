@@ -47,6 +47,9 @@ No myoma predicted in 1 case.
 **vs DA-VNet:** better on macro, wall, cavity, myoma, cavity/wall HD95 and FIGO κ with 4.5× fewer parameters, but
 twice the time per epoch. Fibroid recall is ~0.50 for both, so the misses are not model-specific.
 
+## Kaggle run log
+Full log from the Kaggle run (every epoch, then the val score block): [`mednext_kaggle.log`](kaggle_logs/mednext_kaggle.log).
+
 ## Reproduce
 Kaggle notebook from `notebooks/K1_kaggle_train.ipynb` with the settings above, input `umd-prepared`, GPU T4,
 Internet on, **Save Version → Save & Run All**. Last cell with `--subset val` and `results_val`. Outputs on Drive:
