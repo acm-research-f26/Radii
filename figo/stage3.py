@@ -196,8 +196,8 @@ def main(argv=None):
     if args.splits:
         cases = json.loads(Path(args.splits).read_text())[args.subset]
     else:
-        tail = f"{args.suffix}.nii.gz"
-        cases = sorted(f.name[: -len(tail)] for f in seg_dir.glob(f"*{tail}"))
+        cases = sorted({f.name[: -len(t)] for t in (f"{args.suffix}.nii.gz", f"{args.suffix}.nii")
+                        for f in seg_dir.glob(f"*{t}")})
     rules = FigoRules()
     all_rows = []
     for cid in cases:

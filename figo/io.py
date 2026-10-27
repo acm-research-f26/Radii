@@ -3,6 +3,10 @@
 About 33 UMD ``*_seg.nii.gz`` files are plain (uncompressed) NIfTI despite the
 ``.gz`` suffix, which makes ``nibabel.load`` fail. ``load_nifti`` sniffs the
 gzip magic bytes and falls back to parsing the raw bytes, so all 300 cases load.
+
+Kaggle unpacks uploaded ``.nii.gz`` files to ``.nii``. ``resolve_nifti`` accepts
+either spelling, so code that asks for ``<id>_seg.nii.gz`` also finds
+``<id>_seg.nii`` (and the other way round).
 """
 
 from __future__ import annotations
@@ -21,6 +25,23 @@ def is_gzip(path: str | Path) -> bool:
         return f.read(2) == GZIP_MAGIC
 
 
+def resolve_nifti(path: str | Path) -> Path:
+    """Return ``path`` if it exists, else the same file with ``.nii`` <-> ``.nii.gz`` swapped."""
+    path = Path(path)
+    if path.exists():
+        return path
+    name = path.name
+    if name.endswith(".nii.gz"):
+        alt = path.with_name(name[: -len(".gz")])
+    elif name.endswith(".nii"):
+        alt = path.with_name(name + ".gz")
+    else:
+        alt = None
+    if alt is not None and alt.exists():
+        return alt
+    raise FileNotFoundError(f"{path} (also tried {alt.name if alt else 'no alternative'})")
+
+
 def load_nifti(path: str | Path) -> nib.Nifti1Image:
     """Load a NIfTI file whether or not it is really gzip-compressed.
 
@@ -28,7 +49,7 @@ def load_nifti(path: str | Path) -> nib.Nifti1Image:
     as raw NIfTI. Data is fully read into memory, so the returned image does not
     depend on the file handle staying open.
     """
-    path = Path(path)
+    path = resolve_nifti(path)
     raw = path.read_bytes()
     if raw[:2] == GZIP_MAGIC:
         try:
