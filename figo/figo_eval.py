@@ -9,6 +9,12 @@ detection rate plus exact/coarse FIGO agreement and Cohen's kappa.
     python -m figo.figo_eval agreement --ref-dir data/clean --pred-dir preds/mednext \
         --splits data/splits.json --subset test --out results/mednext_figo_agreement.csv
 
+sensitivity: re-apply the Stage 3 rules to the contact fractions stored in a
+Stage 3 CSV with each threshold nudged up and down, and count how many FIGO
+calls change. No volumes are re-read, so it runs in seconds on CPU.
+    python -m figo.figo_eval sensitivity --csv results/figo_expert_all.csv \
+        --out results/figo_sensitivity.csv
+
 UMD ships no FIGO labels, so "agreement" is agreement with the FIGO types
 derived from the expert masks by the same rules - it measures how much the
 segmentation error changes the FIGO call, not true clinical accuracy.
@@ -20,12 +26,13 @@ import argparse
 import csv
 import json
 from collections import Counter
+from dataclasses import fields, replace
 from pathlib import Path
 
 import numpy as np
 
 from .io import load_nifti
-from .stage3 import FigoRules, classify_case, coarse_group
+from .stage3 import FigoRules, _apply_rules, classify_case, coarse_group
 
 # Published frequency ranges as given in the project brief (percent of fibroids).
 # Confirm each against its source paper before using in the write-up.
@@ -127,6 +134,45 @@ def summarize_agreement(pairs, n_ref, n_pred) -> dict:
     }
 
 
+# thresholds nudged by the sensitivity analysis; min_volume_mm3 is excluded
+# because it changes Stage 2 (which fibroids exist), not the FIGO call
+MM_THRESHOLDS = {"endometrium_tol_mm"}
+
+
+def _row_figo(r, rules):
+    dist = float("inf") if r["dist_to_cavity_mm"] in ("inf", "") else float(r["dist_to_cavity_mm"])
+    figo, _, _ = _apply_rules(float(r["frac_cavity"]), float(r["frac_myometrium"]), float(r["frac_outside"]),
+                              float(r["frac_cyst"]), dist, rules)
+    return figo
+
+
+def sensitivity(rows, base=None, delta=0.05, delta_mm=0.5) -> list[dict]:
+    """One result row per (threshold, direction): how many FIGO calls change vs ``base``."""
+    base = base or FigoRules()
+    ref = [_row_figo(r, base) for r in rows]
+    out = []
+    for f in fields(base):
+        if f.name == "min_volume_mm3":
+            continue
+        step = delta_mm if f.name in MM_THRESHOLDS else delta
+        for sign in (-1, 1):
+            val = round(getattr(base, f.name) + sign * step, 4)
+            if val < 0:
+                continue
+            new = [_row_figo(r, replace(base, **{f.name: val})) for r in rows]
+            changed = [(a, b) for a, b in zip(ref, new) if a != b]
+            coarse = sum(coarse_group(a) != coarse_group(b) for a, b in changed)
+            moves = Counter(f"{a}->{b}" for a, b in changed).most_common(3)
+            out.append({
+                "threshold": f.name, "base": getattr(base, f.name), "value": val,
+                "n_fibroids": len(rows), "n_changed": len(changed),
+                "pct_changed": round(100 * len(changed) / max(len(rows), 1), 2),
+                "n_coarse_changed": coarse,
+                "top_moves": "; ".join(f"{m} ({c})" for m, c in moves),
+            })
+    return out
+
+
 def _load_seg(path):
     nii = load_nifti(path)
     return np.rint(np.asarray(nii.dataobj)).astype(np.uint8), nii
@@ -137,6 +183,11 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("distribution")
     d.add_argument("--csv", required=True)
+    s = sub.add_parser("sensitivity")
+    s.add_argument("--csv", required=True, help="Stage 3 CSV (e.g. expert masks, all cases)")
+    s.add_argument("--delta", type=float, default=0.05, help="step for fraction thresholds")
+    s.add_argument("--delta-mm", type=float, default=0.5, help="step for distance thresholds (mm)")
+    s.add_argument("--out")
     a = sub.add_parser("agreement")
     a.add_argument("--ref-dir", required=True, help="clean/ folder with <id>_seg.nii.gz")
     a.add_argument("--pred-dir", required=True, help="folder with <id>.nii.gz predictions")
@@ -148,6 +199,19 @@ def main(argv=None):
     if args.cmd == "distribution":
         with open(args.csv) as f:
             print_distribution(list(csv.DictReader(f)))
+        return
+    if args.cmd == "sensitivity":
+        with open(args.csv) as f:
+            res = sensitivity(list(csv.DictReader(f)), delta=args.delta, delta_mm=args.delta_mm)
+        for r in res:
+            print(f"{r['threshold']:30s} {r['base']:>6} -> {r['value']:<6} changed {r['n_changed']:4d} "
+                  f"({r['pct_changed']:5.1f}%), coarse {r['n_coarse_changed']:3d}   {r['top_moves']}")
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            with open(args.out, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(res[0]))
+                w.writeheader()
+                w.writerows(res)
         return
 
     import nibabel as nib

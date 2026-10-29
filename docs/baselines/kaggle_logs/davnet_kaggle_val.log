@@ -1,0 +1,71 @@
+# DA-VNet: Baseline Implementation - validation scoring log
+# Source: Kaggle scoring notebook (best.pt from the training run, epoch 149) (Save & Run All commit). Debugger/pip/nbconvert noise removed; lines otherwise verbatim.
+
+rebuilt best.pt from /kaggle/input/datasets/anaghathota/davnet-model/best
+checkpoint epoch 149 val_ema 0.5083010671656512
+splits: /kaggle/input/datasets/anaghathota/umd-prepared/splits.json
+model : /tmp/best.pt
+60 files ready for 30 val cases (expect 60 for 30)
+name, memory.total [MiB]
+Tesla T4, 15360 MiB
+Tesla T4, 15360 MiB
+[1/30] UMD_221129_014
+[2/30] UMD_221129_016
+[3/30] UMD_221129_020
+[4/30] UMD_221129_045
+[5/30] UMD_221129_066
+[6/30] UMD_221129_074
+[7/30] UMD_221129_077
+[8/30] UMD_221129_092
+[9/30] UMD_221129_093
+[10/30] UMD_221129_131
+[11/30] UMD_221129_141
+[12/30] UMD_221129_147
+[13/30] UMD_221129_153
+[14/30] UMD_221129_164
+[15/30] UMD_221129_173
+[16/30] UMD_221129_183
+[17/30] UMD_221129_204
+[18/30] UMD_221129_205
+[19/30] UMD_221129_206
+[20/30] UMD_221129_210
+[21/30] UMD_221129_228
+[22/30] UMD_221129_231
+[23/30] UMD_221129_245
+[24/30] UMD_221129_250
+[25/30] UMD_221129_263
+[26/30] UMD_221129_266
+[27/30] UMD_221129_273
+[28/30] UMD_221129_281
+[29/30] UMD_221129_289
+[30/30] UMD_221129_296
+  10/30
+  20/30
+  30/30
+30 cases from /kaggle/working/preds/davnet
+  dice_wall                           0.793 +/- 0.198
+  hd95_wall                          13.988 +/- 38.816
+  assd_wall                           5.754 +/- 21.638
+  dice_cavity                         0.661 +/- 0.251
+  hd95_cavity                         9.012 +/- 15.133  (2 missed)
+  assd_cavity                         2.230 +/- 3.901  (2 missed)
+  dice_myoma                          0.537 +/- 0.361
+  hd95_myoma                         25.303 +/- 43.688  (4 missed)
+  assd_myoma                         11.960 +/- 29.272  (4 missed)
+  dice_cyst                           0.277 +/- 0.339
+  hd95_cavity_wall_interface          8.762 +/- 14.746  (2 missed)
+  assd_cavity_wall_interface          2.107 +/- 3.687  (2 missed)
+  hd95_serosa                        18.199 +/- 41.486
+  assd_serosa                         6.622 +/- 20.704
+  dice_uterus                         0.848 +/- 0.203
+  macro_dice_wall_cavity_myoma        0.664
+  n_ref_fibroids         111
+  n_pred_fibroids        89
+  n_matched              56
+  detection_recall       0.505
+  detection_precision    0.629
+  exact_agreement        0.679
+  coarse_agreement       0.821
+  kappa_exact            0.473
+  kappa_coarse           0.590
+Done. Download preds/, results_val/ and runs/ from the Output tab.

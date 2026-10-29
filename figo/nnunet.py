@@ -15,13 +15,26 @@ nnU-Net during training or model selection.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import shutil
 from pathlib import Path
 
+from .io import is_gzip, resolve_nifti
+
 DATASET_ID = 501
 DATASET_NAME = f"Dataset{DATASET_ID}_UMD"
 LABELS = {"background": 0, "uterine_wall": 1, "uterine_cavity": 2, "myoma": 3, "nabothian_cyst": 4}
+
+
+def _copy_gz(src, dst):
+    """Copy ``src`` (``.nii`` or ``.nii.gz``) to ``dst`` as a properly gzipped file."""
+    src = resolve_nifti(src)
+    if is_gzip(src):
+        shutil.copyfile(src, dst)
+    else:
+        with open(src, "rb") as a, gzip.open(dst, "wb") as b:
+            shutil.copyfileobj(a, b)
 
 
 def convert(data_dir, splits_path, raw_root, preprocessed_root):
@@ -32,9 +45,9 @@ def convert(data_dir, splits_path, raw_root, preprocessed_root):
         (ds / sub).mkdir(parents=True, exist_ok=True)
 
     def put(cid, img_sub, lab_sub):
-        # figo.prepare output is correctly gzipped, so nnU-Net's reader can open it
-        shutil.copyfile(data / f"{cid}_t2.nii.gz", ds / img_sub / f"{cid}_0000.nii.gz")
-        shutil.copyfile(data / f"{cid}_seg.nii.gz", ds / lab_sub / f"{cid}.nii.gz")
+        # nnU-Net's reader needs real gzip; figo.prepare output already is, Kaggle's unpacked .nii is not
+        _copy_gz(data / f"{cid}_t2.nii.gz", ds / img_sub / f"{cid}_0000.nii.gz")
+        _copy_gz(data / f"{cid}_seg.nii.gz", ds / lab_sub / f"{cid}.nii.gz")
 
     trainval = splits["train"] + splits["val"]
     for cid in trainval:
