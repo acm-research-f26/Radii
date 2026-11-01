@@ -4,7 +4,7 @@
     python -m figo.nnunet convert --data-dir data/clean --splits data/splits.json \
         --nnunet-raw $nnUNet_raw --nnunet-preprocessed $nnUNet_preprocessed
 
-    # make -tr nnUNetTrainer_UMD available (capped epochs, frequent checkpoints)
+    # install the UMD, fine-tuning control, and boundary-loss trainers
     python -m figo.nnunet install-trainer
 
 Train/val cases go to imagesTr (fold 0 of ``splits_final.json`` reproduces our
@@ -60,9 +60,16 @@ def convert(data_dir, splits_path, raw_root, preprocessed_root):
 def install_trainer():
     import nnunetv2
 
-    dst = Path(nnunetv2.__file__).parent / "training" / "nnUNetTrainer" / "variants" / "nnUNetTrainer_UMD.py"
-    shutil.copyfile(Path(__file__).with_name("nnunet_trainer_umd.py"), dst)
-    print(f"Installed nnUNetTrainer_UMD -> {dst}")
+    variants = Path(nnunetv2.__file__).parent / "training" / "nnUNetTrainer" / "variants"
+    trainers = (
+        ("nnunet_trainer_umd.py", "nnUNetTrainer_UMD.py"),
+        ("nnunet_trainer_umd_ft.py", "nnUNetTrainer_UMD_FT.py"),
+        ("nnunet_trainer_umd_boundary.py", "nnUNetTrainer_UMD_Boundary.py"),
+    )
+    for source, destination in trainers:
+        dst = variants / destination
+        shutil.copyfile(Path(__file__).with_name(source), dst)
+        print(f"Installed {destination[:-3]} -> {dst}")
 
 
 def main(argv=None):

@@ -2,3 +2,4 @@
 torch
 pytest
 nbformat
+nnunetv2==2.8.1
