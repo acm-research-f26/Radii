@@ -191,20 +191,33 @@ VARIANT = '3d_fullres'   # '3d_fullres' (nnU-Net default plans) | 'resenc' (nnUN
 SMOKE = True             # True: 3-epoch timing run into a separate smoke/ folder. False: the real run
 EPOCHS = 250             # set from the smoke-test timing; identical for both variants and across sessions
 '''),
-    ("code", COMMON_SETUP + '''
+    ("code", COMMON_SETUP.replace(
+        "from google.colab import drive",
+        "BRANCH = 'ira-exp1-boundary-loss'\nfrom google.colab import drive",
+    ).replace(
+        "%cd {REPO}",
+        "subprocess.run(['git', '-C', REPO, 'fetch', 'origin', BRANCH], check=True)\n"
+        "subprocess.run(['git', '-C', REPO, 'checkout', BRANCH], check=True)\n"
+        "subprocess.run(['git', '-C', REPO, 'pull', '-q', 'origin', BRANCH], check=True)\n"
+        "%cd {REPO}",
+    ) + '''
 !pip -q install 'nnunetv2>=2.5'  # nnUNetTrainer_UMD matches the >=2.5 __init__ signature'''),
     ("code", '''
-import os
-os.environ['nnUNet_raw'] = '/content/nnUNet_raw'
-os.environ['nnUNet_preprocessed'] = '/content/nnUNet_preprocessed'
-os.environ['nnUNet_results'] = f'{DRIVE}/smoke/nnUNet_results' if SMOKE else f'{DRIVE}/nnUNet_results'
-os.environ['UMD_NNUNET_EPOCHS'] = '3' if SMOKE else str(EPOCHS)
-PLANS = 'nnUNetPlans' if VARIANT == '3d_fullres' else 'nnUNetResEncUNetMPlans'
-PLANNER = [] if VARIANT == '3d_fullres' else ['-pl', 'nnUNetPlannerResEncM']
+   import os, subprocess
+   os.environ['nnUNet_raw'] = '/content/nnUNet_raw'
+   os.environ['nnUNet_preprocessed'] = '/content/nnUNet_preprocessed'
+   os.environ['nnUNet_results'] = f'{DRIVE}/smoke/nnUNet_results' if SMOKE else f'{DRIVE}/nnUNet_results'
+   os.environ['UMD_NNUNET_EPOCHS'] = '3' if SMOKE else str(EPOCHS)
+   os.environ['nnUNet_n_proc_DA'] = '2'     # Colab has 2 CPUs; fixed data-loader worker crashes
+   os.environ['nnUNet_compile'] = 'false'   # skip torch.compile
+   PLANS = 'nnUNetPlans' if VARIANT == '3d_fullres' else 'nnUNetResEncUNetMPlans'
+   PLANNER = [] if VARIANT == '3d_fullres' else ['-pl', 'nnUNetPlannerResEncM']
 
-!python -m figo.nnunet convert --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
-    --nnunet-raw $nnUNet_raw --nnunet-preprocessed $nnUNet_preprocessed
-!python -m figo.nnunet install-trainer
+   subprocess.run(['python', '-m', 'figo.nnunet', 'convert',
+       '--data-dir', f'{DRIVE}/data/clean', '--splits', f'{DRIVE}/data/splits.json',
+       '--nnunet-raw', os.environ['nnUNet_raw'],
+       '--nnunet-preprocessed', os.environ['nnUNet_preprocessed']], check=True)
+   subprocess.run(['python', '-m', 'figo.nnunet', 'install-trainer'], check=True)
 '''),
     ("code", '''
 # Preprocessing is CPU work: run up to this cell once on a CPU runtime; it is cached on Drive
@@ -246,7 +259,35 @@ RES = f'{DRIVE}/results'
 !python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {PRED} \\
     --splits {DRIVE}/data/splits.json --subset test --out {RES}/{NAME}_figo_agreement.csv
 '''),
+("code", '''
+EPOCHS = '50'
+os.environ['UMD_NNUNET_EPOCHS'] = EPOCHS
+os.environ['UMD_BASELINE_CKPT'] = f"{DRIVE}/nnUNet_results/Dataset501_UMD/nnUNetTrainer_UMD__nnUNetResEncUNetMPlans__3d_fullres/fold_0/checkpoint_best.pth"
+os.environ['nnUNet_results'] = f'{DRIVE}/nnUNet_results_ft'
+PLANS = 'nnUNetResEncUNetMPlans'
+fold_dir = f"{os.environ['nnUNet_results']}/Dataset501_UMD/nnUNetTrainer_UMD_FT__{PLANS}__3d_fullres/fold_0"
+resume = ['--c'] if os.path.exists(f'{fold_dir}/checkpoint_latest.pth') else []
+print('resuming' if resume else 'starting fresh', fold_dir)
+!nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainer_UMD_FT -p {PLANS} {' '.join(resume)}
+'''),
+("code", '''
+EPOCHS = '50'
+os.environ['UMD_NNUNET_EPOCHS'] = EPOCHS
+os.environ['UMD_BASELINE_CKPT'] = f"{DRIVE}/nnUNet_results/Dataset501_UMD/nnUNetTrainer_UMD__nnUNetResEncUNetMPlans__3d_fullres/fold_0/checkpoint_best.pth"
+os.environ['nnUNet_results'] = f'{DRIVE}/nnUNet_results_ft'
+PLANS = 'nnUNetResEncUNetMPlans'
+fold_dir = f"{os.environ['nnUNet_results']}/Dataset501_UMD/nnUNetTrainer_UMD_Boundary__{PLANS}__3d_fullres/fold_0"
+resume = ['--c'] if os.path.exists(f'{fold_dir}/checkpoint_latest.pth') else []
+print('resuming' if resume else 'starting fresh', fold_dir)
+!nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainer_UMD_Boundary -p {PLANS} {' '.join(resume)}
+'''),
 ])
+for cell, cell_id in zip(nnunet["cells"], (
+    "U9M_t4BSfk5z", "OVE3s9CWfk51", "QHW0zcwYfk52", "MkCBBk-Cfk53", "z_aVwGoKfk54",
+    "wM9V8_Lofk55", "xPpiJDf_fk55", "nnWNCLndfk56", "_sbT-Chkfk56",
+    "UMD_FT_Control", "UMD_Boundary",
+)):
+    cell["metadata"]["id"] = cell_id
 
 setup["cells"] += nb([
     ("markdown", '''
@@ -396,5 +437,6 @@ else:
 for name, book in [("00_setup_data.ipynb", setup), ("01_train_custom_model.ipynb", train),
                    ("02_nnunet.ipynb", nnunet), ("03_select_and_figo.ipynb", figo),
                    ("K1_kaggle_train.ipynb", kaggle)]:
-    (OUT / name).write_text(json.dumps(book, indent=1) + "\n")
+    indent = 2 if name == "02_nnunet.ipynb" else 1
+    (OUT / name).write_text(json.dumps(book, indent=indent) + "\n")
     print("wrote", OUT / name)
