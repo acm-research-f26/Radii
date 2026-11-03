@@ -15,6 +15,11 @@ calls change. No volumes are re-read, so it runs in seconds on CPU.
     python -m figo.figo_eval sensitivity --csv results/figo_expert_all.csv \
         --out results/figo_sensitivity.csv
 
+errors: where each model's FIGO calls go wrong (ref->pred confusions) and what
+its missed fibroids look like (size, slices), from the agreement CSVs.
+    python -m figo.figo_eval errors --csvs results_val/*_figo_agreement.csv \
+        --out results_val/figo_error_table.csv
+
 UMD ships no FIGO labels, so "agreement" is agreement with the FIGO types
 derived from the expert masks by the same rules - it measures how much the
 segmentation error changes the FIGO call, not true clinical accuracy.
@@ -104,15 +109,25 @@ def match_instances(inst_ref, inst_pred, min_dice=0.1):
     return matches
 
 
-def agreement_case(ref_seg, pred_seg, spacing, rules=None):
+def agreement_case_full(ref_seg, pred_seg, spacing, rules=None):
+    """Matched pairs, missed expert fibroids, and fibroid counts for one case."""
     inst_r, rows_r = classify_case(ref_seg, spacing, rules)
     inst_p, rows_p = classify_case(pred_seg, spacing, rules)
     by_r = {r["fibroid_id"]: r for r in rows_r}
     by_p = {r["fibroid_id"]: r for r in rows_p}
     matches = match_instances(inst_r, inst_p)
     pairs = [{"ref_id": r, "pred_id": q, "dice": round(d, 3), "ref_figo": by_r[r]["figo"],
-              "pred_figo": by_p[q]["figo"], "ref_volume_ml": by_r[r]["volume_ml"]} for r, q, d in matches]
-    return pairs, len(rows_r), len(rows_p)
+              "pred_figo": by_p[q]["figo"], "ref_volume_ml": by_r[r]["volume_ml"],
+              "ref_n_slices": by_r[r]["n_slices"]} for r, q, d in matches]
+    hit = {r for r, _, _ in matches}
+    missed = [{"ref_id": r["fibroid_id"], "ref_figo": r["figo"], "ref_volume_ml": r["volume_ml"],
+               "ref_n_slices": r["n_slices"]} for r in rows_r if r["fibroid_id"] not in hit]
+    return pairs, missed, len(rows_r), len(rows_p)
+
+
+def agreement_case(ref_seg, pred_seg, spacing, rules=None):
+    pairs, _, nr, npd = agreement_case_full(ref_seg, pred_seg, spacing, rules)
+    return pairs, nr, npd
 
 
 def summarize_agreement(pairs, n_ref, n_pred) -> dict:
@@ -173,6 +188,42 @@ def sensitivity(rows, base=None, delta=0.05, delta_mm=0.5) -> list[dict]:
     return out
 
 
+def _missed_path(agreement_csv) -> Path:
+    p = Path(agreement_csv)
+    return p.with_name(p.stem + "_missed.csv")
+
+
+def _median(xs):
+    return float(np.median(xs)) if xs else float("nan")
+
+
+def error_report(pairs, missed, top=5) -> dict:
+    """Where a model's FIGO calls go wrong, and what its missed fibroids look like."""
+    wrong = Counter(f"{p['ref_figo']}->{p['pred_figo']}" for p in pairs if p["ref_figo"] != p["pred_figo"])
+    coarse = Counter(f"{coarse_group(p['ref_figo'])}->{coarse_group(p['pred_figo'])}" for p in pairs
+                     if coarse_group(p["ref_figo"]) != coarse_group(p["pred_figo"]))
+    per_type = {}
+    for p in pairs:
+        t = per_type.setdefault(p["ref_figo"], [0, 0])
+        t[0] += 1
+        t[1] += p["ref_figo"] == p["pred_figo"]
+    vol_hit = [float(p["ref_volume_ml"]) for p in pairs]
+    vol_miss = [float(m["ref_volume_ml"]) for m in missed]
+    n_ref = len(pairs) + len(missed)
+    thin_miss = sum(int(m["ref_n_slices"]) <= 2 for m in missed)
+    small_miss = sum(float(m["ref_volume_ml"]) < 1.0 for m in missed)
+    return {
+        "n_matched": len(pairs), "n_missed": len(missed),
+        "recall": len(pairs) / n_ref if n_ref else float("nan"),
+        "top_errors": wrong.most_common(top),
+        "top_coarse_errors": coarse.most_common(top),
+        "per_type_accuracy": {k: (v[1], v[0]) for k, v in sorted(per_type.items())},
+        "median_ml_found": _median(vol_hit), "median_ml_missed": _median(vol_miss),
+        "missed_small_lt_1ml": small_miss, "missed_thin_le_2_slices": thin_miss,
+        "missed_by_type": dict(Counter(m["ref_figo"] for m in missed).most_common()),
+    }
+
+
 def _load_seg(path):
     nii = load_nifti(path)
     return np.rint(np.asarray(nii.dataobj)).astype(np.uint8), nii
@@ -194,6 +245,9 @@ def main(argv=None):
     a.add_argument("--splits", required=True)
     a.add_argument("--subset", default="test")
     a.add_argument("--out", required=True)
+    e = sub.add_parser("errors", help="FIGO error table across models from agreement CSVs")
+    e.add_argument("--csvs", nargs="+", required=True, help="<model>_figo_agreement.csv files")
+    e.add_argument("--out", help="write one summary row per model to this CSV")
     args = p.parse_args(argv)
 
     if args.cmd == "distribution":
@@ -214,11 +268,49 @@ def main(argv=None):
                 w.writerows(res)
         return
 
+    if args.cmd == "errors":
+        rows = []
+        for path in args.csvs:
+            path = Path(path)
+            model = path.name.replace("_figo_agreement.csv", "")
+            with open(path) as f:
+                pairs = list(csv.DictReader(f))
+            mpath = _missed_path(path)
+            missed = []
+            if mpath.exists():
+                with open(mpath) as f:
+                    missed = list(csv.DictReader(f))
+            r = error_report(pairs, missed)
+            print(f"\n== {model}: {r['n_matched']} matched, {r['n_missed']} missed (recall {r['recall']:.2f})")
+            print("  top FIGO errors (ref->pred):", ", ".join(f"{k} x{v}" for k, v in r["top_errors"]) or "none")
+            print("  coarse errors:", ", ".join(f"{k} x{v}" for k, v in r["top_coarse_errors"]) or "none")
+            print("  per-type correct/total:",
+                  ", ".join(f"{t}: {c}/{n}" for t, (c, n) in r["per_type_accuracy"].items()))
+            if mpath.exists():
+                print(f"  missed: median {r['median_ml_missed']:.2f} ml vs found {r['median_ml_found']:.2f} ml; "
+                      f"{r['missed_small_lt_1ml']}/{r['n_missed']} < 1 ml, "
+                      f"{r['missed_thin_le_2_slices']}/{r['n_missed']} on <= 2 slices; by type {r['missed_by_type']}")
+            rows.append({"model": model, "n_matched": r["n_matched"], "n_missed": r["n_missed"],
+                         "recall": round(r["recall"], 3),
+                         "top_errors": "; ".join(f"{k} x{v}" for k, v in r["top_errors"]),
+                         "top_coarse_errors": "; ".join(f"{k} x{v}" for k, v in r["top_coarse_errors"]),
+                         "median_ml_found": round(r["median_ml_found"], 3),
+                         "median_ml_missed": round(r["median_ml_missed"], 3),
+                         "missed_lt_1ml": r["missed_small_lt_1ml"],
+                         "missed_le_2_slices": r["missed_thin_le_2_slices"]})
+        if args.out and rows:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            with open(args.out, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(rows[0]))
+                w.writeheader()
+                w.writerows(rows)
+        return
+
     import nibabel as nib
 
     cases = json.loads(Path(args.splits).read_text())[args.subset]
     rules = FigoRules()
-    all_pairs, n_ref, n_pred = [], 0, 0
+    all_pairs, all_missed, n_ref, n_pred = [], [], 0, 0
     for cid in cases:
         ref, ref_nii = _load_seg(Path(args.ref_dir) / f"{cid}_seg.nii.gz")
         pred_nii = load_nifti(Path(args.pred_dir) / f"{cid}.nii.gz")
@@ -227,17 +319,22 @@ def main(argv=None):
         can_p = nib.as_closest_canonical(pred_nii)
         pred = np.rint(np.asarray(can_p.dataobj)).astype(np.uint8)
         spacing = can_p.header.get_zooms()[:3]
-        pairs, nr, npd = agreement_case(ref, pred, spacing, rules)
+        pairs, missed, nr, npd = agreement_case_full(ref, pred, spacing, rules)
         all_pairs += [{"case_id": cid, **x} for x in pairs]
+        all_missed += [{"case_id": cid, **x} for x in missed]
         n_ref += nr
         n_pred += npd
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="") as f:
-        fields = ["case_id", "ref_id", "pred_id", "dice", "ref_figo", "pred_figo", "ref_volume_ml"]
+        fields = ["case_id", "ref_id", "pred_id", "dice", "ref_figo", "pred_figo", "ref_volume_ml", "ref_n_slices"]
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(all_pairs)
+    with open(_missed_path(out), "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["case_id", "ref_id", "ref_figo", "ref_volume_ml", "ref_n_slices"])
+        w.writeheader()
+        w.writerows(all_missed)
     summary = summarize_agreement(all_pairs, n_ref, n_pred)
     out.with_suffix(".summary.json").write_text(json.dumps(summary, indent=1))
     for k, v in summary.items():
