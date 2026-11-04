@@ -46,3 +46,31 @@ results/                     <model>_seg.csv / _figo_agreement.csv + .summary.js
 | Week 1 | Anagha | `K1_kaggle_train` smoke test, `MODEL='aksunet'` | | `SMOKE=True` |
 | Week 1 | Snigdha | `01_train_custom_model` smoke test, `MODEL='davnet'` | | `SMOKE=True` |
 | | | | | |
+
+## Week 2 results (validation set, 30 cases)
+
+Scored with `figo.evaluate` + `figo.figo_eval agreement` on `--subset val`; the test set is untouched until week 4.
+Macro Dice = mean of wall, cavity and myoma Dice. Fill in your row when your model is scored.
+
+| Model | Who | Where | Epochs | s/epoch | Macro Dice | Wall | Cavity | Myoma | Uterus | Cavity/wall HD95 (mm) | Fibroid recall | FIGO κ coarse |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| nnU-Net 3d_fullres | Purnima | Colab A | | | | | | | | | | |
+| nnU-Net ResEnc M | Ira | Colab B | | | | | | | | | | |
+| MedNeXt | Anagha | Kaggle T4 | 150 | 181 | 0.710 | 0.835 | 0.708 | 0.587 | 0.854 | 7.5 | 0.50 | 0.65 |
+| AKS-UNet | Snigdha | Kaggle T4 | 150 | | | | | | | | | |
+| DA-VNet | Anagha | Kaggle T4 | 150 | 86 | 0.664 | 0.793 | 0.661 | 0.537 | 0.848 | 8.8 | 0.51 | 0.59 |
+| U-Net | Snigdha | Kaggle T4 | 150 | | | | | | | | | |
+
+Notes:
+- Published single-structure numbers are not macro Dice: DA-VNet's 0.878 (Liu et al. 2025) is fibroid-only Dice on a
+  private axial dataset, so compare it with the Myoma column, not Macro.
+- Both custom models so far find only ~50% of expert fibroids (mostly small ones); worth a week-3 look.
+
+## Kaggle notes
+
+- Kaggle unpacks uploaded `.nii.gz` files to `.nii` (and `.pt` checkpoints into folders, since they are zip
+  archives). `figo.io.resolve_nifti` now accepts either spelling, so `figo.infer`, `figo.evaluate`, `figo.stage3`
+  and `figo.figo_eval` run directly on a Kaggle `clean/` folder. To re-upload a checkpoint, zip its unpacked folder
+  back up, or attach the training notebook's output instead of uploading `best.pt`.
+- Commit runs (Save Version -> Save & Run All) keep `/kaggle/working`; an interactive session started by clicking a
+  cell in the editor uses GPU quota in parallel, so stop it and close the editor tab.

@@ -98,3 +98,25 @@ def test_instances_min_volume():
     seg[30:50, 30:50, 1:4] = MYOMA
     _, info = fibroid_instances(seg, ISO, min_volume_mm3=10)
     assert len(info) == 1 and info[0]["n_voxels"] == 1200
+
+
+def test_intramural_cut_is_configurable():
+    # 45% of surface outside -> 55% intramural: type 5 at the default cut, type 6 if the cut moves to 0.6
+    assert _apply_rules(0.0, 0.55, 0.45, 0.0, 10.0, FigoRules())[0] == "5"
+    assert _apply_rules(0.0, 0.55, 0.45, 0.0, 10.0, FigoRules(intramural_cut=0.6))[0] == "6"
+
+
+def test_sensitivity_counts_changed_calls():
+    from figo.figo_eval import sensitivity
+
+    def row(f_cav, f_tis, f_out, dist):
+        return {"frac_cavity": f_cav, "frac_myometrium": f_tis, "frac_outside": f_out,
+                "frac_cyst": 0.0, "dist_to_cavity_mm": dist}
+
+    rows = [row(0.0, 1.0, 0.0, "inf"),      # type 4, far from everything: never changes
+            row(0.0, 0.53, 0.47, "8.0")]     # type 5, 3 points from the 50% cut
+    res = {(r["threshold"], r["value"]): r for r in sensitivity(rows, delta=0.05)}
+    assert res[("intramural_cut", 0.55)]["n_changed"] == 1
+    assert res[("intramural_cut", 0.55)]["n_coarse_changed"] == 0   # 5 -> 6 stays subserosal
+    assert res[("intramural_cut", 0.45)]["n_changed"] == 0
+    assert "min_volume_mm3" not in {r["threshold"] for r in res.values()}
