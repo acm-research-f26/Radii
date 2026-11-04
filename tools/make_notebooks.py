@@ -393,8 +393,162 @@ else:
 '''),
 ])
 
+week3 = nb([
+    ('markdown', '''
+# Week 3 - Post-processing + FIGO error table (CPU)
+
+Runtime: **CPU** (no GPU needed). Signed in as the account that has the `figo` folder in My Drive.
+Scores the **fold_0/validation** predictions (the same files Snigdha used) with and without post-processing,
+then builds the FIGO error table. Missed fibroids are counted against Stage 3 run on the **expert masks**.
+All outputs go to `results_val/postprocess/` so nobody else's files are overwritten.
+About 5-8 minutes per model. Keep the tab open. Re-running skips work that is already done.
+'''),
+    ('code', '''
+# setup
+import os, subprocess, sys
+from google.colab import drive
+drive.mount('/content/drive')
+DRIVE = '/content/drive/MyDrive/figo'
+REPO = '/content/figo-repo'
+BRANCH = 'final-validation'   # switch to 'main' once this branch is merged
+if not os.path.exists(REPO):
+    subprocess.run(['git', 'clone', '-q', '-b', BRANCH, 'https://github.com/acm-research-f26/Radii.git', REPO], check=True)
+else:
+    subprocess.run(['git', '-C', REPO, 'pull', '-q'], check=True)
+os.chdir(REPO)
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nibabel', 'scipy'], check=True)
+'''),
+    ('code', '''
+# find every model's val predictions
+import glob, json
+
+SPLITS = f'{DRIVE}/data/splits.json'
+CLEAN = f'{DRIVE}/data/clean'
+RES = f'{DRIVE}/results_val/postprocess'
+RUN_ONLY = ['nnunet_resenc', 'nnunet_3d_fullres', 'ensemble', 'resenc_ft_control']   # [] = every model found
+PP = f'{DRIVE}/preds_pp'
+VAL = json.load(open(SPLITS))['val']
+NN = f'{DRIVE}/nnUNet_results/Dataset501_UMD'
+NN_FT = f'{DRIVE}/nnUNet_results_ft/Dataset501_UMD'
+
+CANDIDATES = {   # model name -> folder(s) to look in, first match wins
+    'nnunet_resenc':     [f'{NN}/nnUNetTrainer_UMD__nnUNetResEncUNetMPlans__3d_fullres/fold_0/validation', f'{DRIVE}/preds/nnunet_resenc'],
+    'nnunet_3d_fullres': [f'{NN}/nnUNetTrainer_UMD__nnUNetPlans__3d_fullres/fold_0/validation', f'{DRIVE}/preds/nnunet_3d_fullres'],
+    'mednext':  [f'{DRIVE}/preds/mednext'],
+    'aksunet':  [f'{DRIVE}/preds/aksunet'],
+    'davnet':   [f'{DRIVE}/preds/davnet'],
+    'unet3d':   [f'{DRIVE}/preds/unet3d'],
+    # week-3 outputs, picked up automatically once they exist
+    'resenc_ft_control':  [f'{NN_FT}/nnUNetTrainer_UMD_FT__nnUNetResEncUNetMPlans__3d_fullres/fold_0/validation'],
+    'resenc_ft_boundary': [f'{NN_FT}/nnUNetTrainer_UMD_Boundary__nnUNetResEncUNetMPlans__3d_fullres/fold_0/validation'],
+    'ensemble':           [f'{DRIVE}/preds/ensemble_val'],
+}
+
+def n_val_preds(folder):
+    return sum(os.path.exists(f'{folder}/{c}.nii.gz') or os.path.exists(f'{folder}/{c}.nii') for c in VAL)
+
+MODELS = {}
+for name, folders in CANDIDATES.items():
+    if RUN_ONLY and name not in RUN_ONLY:
+        continue
+    for d in folders:
+        if os.path.isdir(d):
+            n = n_val_preds(d)
+            if n == len(VAL):
+                MODELS[name] = d
+                break
+            print(f'  {name}: {d} has {n}/{len(VAL)} val cases - skipped (test-set or partial predictions?)')
+print('\\nUsing:')
+for k, v in MODELS.items():
+    print(f'  {k:20s} {v}')
+missing = [k for k in (RUN_ONLY or CANDIDATES) if k not in MODELS]
+print('Not found yet:', ', '.join(missing) or 'none')
+'''),
+    ('code', '''
+# run: agreement without post-processing, then post-process + evaluate + agreement
+def run(*args):
+    r = subprocess.run([sys.executable, '-m', *args], capture_output=True, text=True)
+    if r.returncode:
+        print(r.stdout[-2000:], r.stderr[-3000:])
+        raise RuntimeError(' '.join(args[:2]) + ' failed')
+    return r.stdout
+
+os.makedirs(RES, exist_ok=True)
+for name, pred in MODELS.items():
+    print(f'\\n=== {name}')
+    if not os.path.exists(f'{RES}/{name}_seg.summary.json'):
+        print(run('figo.evaluate', '--pred-dir', pred, '--data-dir', CLEAN, '--splits', SPLITS,
+                  '--subset', 'val', '--out', f'{RES}/{name}_seg.csv').strip().splitlines()[-1])
+    if not os.path.exists(f'{RES}/{name}_figo_agreement_missed.csv'):
+        run('figo.figo_eval', 'agreement', '--ref-dir', CLEAN, '--pred-dir', pred, '--splits', SPLITS,
+            '--subset', 'val', '--out', f'{RES}/{name}_figo_agreement.csv')
+    pp = f'{PP}/{name}'
+    if n_val_preds(pp) < len(VAL):
+        print(run('figo.postprocess', '--in-dir', pred, '--out-dir', pp, '--splits', SPLITS, '--subset', 'val').strip())
+    if not os.path.exists(f'{RES}/{name}_pp_seg.summary.json'):
+        run('figo.evaluate', '--pred-dir', pp, '--data-dir', CLEAN, '--splits', SPLITS,
+            '--subset', 'val', '--out', f'{RES}/{name}_pp_seg.csv')
+    if not os.path.exists(f'{RES}/{name}_pp_figo_agreement_missed.csv'):
+        run('figo.figo_eval', 'agreement', '--ref-dir', CLEAN, '--pred-dir', pp, '--splits', SPLITS,
+            '--subset', 'val', '--out', f'{RES}/{name}_pp_figo_agreement.csv')
+    print('  done')
+'''),
+    ('code', '''
+# with vs without post-processing
+import csv
+KEYS = [('macro_dice_wall_cavity_myoma', 'macro'), ('dice_wall', 'wall'), ('dice_cavity', 'cavity'),
+        ('dice_myoma', 'myoma'), ('dice_uterus', 'uterus'), ('hd95_cavity_wall_interface', 'cav/wall HD95')]
+FKEYS = [('detection_recall', 'recall'), ('n_ref_fibroids', 'n_ref'), ('n_matched', 'n_matched'),
+         ('kappa_coarse', 'FIGO kappa (coarse)'), ('kappa_exact', 'FIGO kappa (exact)')]
+
+def summ(path):
+    try:
+        return json.load(open(path))
+    except FileNotFoundError:
+        return {}
+
+def val(d, k):
+    v = d.get(k)
+    return v.get('mean') if isinstance(v, dict) else v
+
+table = []
+for name in MODELS:
+    for tag, suffix in (('raw', ''), ('pp', '_pp')):
+        seg, fig = summ(f'{RES}/{name}{suffix}_seg.summary.json'), summ(f'{RES}/{name}{suffix}_figo_agreement.summary.json')
+        row = {'model': name, 'post': tag}
+        row.update({lab: val(seg, k) for k, lab in KEYS})
+        row.update({lab: val(fig, k) for k, lab in FKEYS})
+        if isinstance(row.get('n_ref'), int) and isinstance(row.get('n_matched'), int):
+            row['n_missed'] = row['n_ref'] - row['n_matched']
+        table.append(row)
+
+cols = list(table[0])
+cols = [c for c in cols if c not in ('n_ref', 'n_matched', 'n_missed')] + ['n_missed']
+fmt = lambda v: f'{v:.3f}' if isinstance(v, float) else str(v)
+print(' | '.join(cols))
+for r in table:
+    print(' | '.join(fmt(r.get(c)) for c in cols))
+with open(f'{RES}/postprocess_comparison.csv', 'w', newline='') as f:
+    w = csv.DictWriter(f, fieldnames=cols, extrasaction='ignore'); w.writeheader(); w.writerows(table)
+print(f'\\nsaved {RES}/postprocess_comparison.csv')
+'''),
+    ('code', '''
+# FIGO error table + missed-fibroid check (raw predictions, i.e. the baselines as they are)
+csvs = [f'{RES}/{n}_figo_agreement.csv' for n in MODELS]
+print(run('figo.figo_eval', 'errors', '--csvs', *csvs, '--out', f'{RES}/figo_error_table.csv'))
+print(f'saved {RES}/figo_error_table.csv')
+'''),
+    ('code', '''
+# same, after post-processing
+csvs = [f'{RES}/{n}_pp_figo_agreement.csv' for n in MODELS]
+print(run('figo.figo_eval', 'errors', '--csvs', *csvs, '--out', f'{RES}/figo_error_table_pp.csv'))
+'''),
+])
+week3["metadata"].pop("accelerator", None)
+week3["metadata"]["colab"].pop("gpuType", None)
+
 for name, book in [("00_setup_data.ipynb", setup), ("01_train_custom_model.ipynb", train),
                    ("02_nnunet.ipynb", nnunet), ("03_select_and_figo.ipynb", figo),
-                   ("K1_kaggle_train.ipynb", kaggle)]:
+                   ("K1_kaggle_train.ipynb", kaggle), ("04_postprocess_figo.ipynb", week3)]:
     (OUT / name).write_text(json.dumps(book, indent=1) + "\n")
     print("wrote", OUT / name)
