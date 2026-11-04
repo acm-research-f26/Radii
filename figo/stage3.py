@@ -187,7 +187,7 @@ def main(argv=None):
     p.add_argument("--seg-dir", required=True)
     p.add_argument("--suffix", default="", help="'_seg' for expert masks in clean/, '' for predictions")
     p.add_argument("--splits")
-    p.add_argument("--subset", default="test")
+    p.add_argument("--subset", default="val")
     p.add_argument("--out", required=True)
     args = p.parse_args(argv)
 
