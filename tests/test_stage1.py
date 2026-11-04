@@ -127,7 +127,7 @@ def test_end_to_end(umd, tmp_path):
     assert load_nifti(preds / f"{test_id}.nii.gz").shape == (8, 64, 64)
 
     evaluate.main(["--pred-dir", str(preds), "--data-dir", str(data / "clean"), "--splits",
-                   str(data / "splits.json"), "--out", str(tmp_path / "seg.csv")])
+                   str(data / "splits.json"), "--subset", "test", "--out", str(tmp_path / "seg.csv")])
     assert (tmp_path / "seg.summary.json").exists()
 
     # expert masks scored against themselves: perfect FIGO agreement
@@ -135,9 +135,15 @@ def test_end_to_end(umd, tmp_path):
     gt_as_pred.mkdir()
     shutil.copyfile(data / "clean" / f"{test_id}_seg.nii.gz", gt_as_pred / f"{test_id}.nii.gz")
     figo_eval.main(["agreement", "--ref-dir", str(data / "clean"), "--pred-dir", str(gt_as_pred),
-                    "--splits", str(data / "splits.json"), "--out", str(tmp_path / "agree.csv")])
+                    "--splits", str(data / "splits.json"), "--subset", "test", "--out", str(tmp_path / "agree.csv")])
     s = json.loads((tmp_path / "agree.summary.json").read_text())
     assert s["detection_recall"] == 1.0 and s["exact_agreement"] == 1.0
+
+    # default subset is val: without --subset the test case must not be touched
+    val_preds = tmp_path / "val_preds"
+    infer.main(["--checkpoint", str(run / "best.pt"), "--data-dir", str(data / "clean"),
+                "--splits", str(data / "splits.json"), "--out-dir", str(val_preds)])
+    assert {p.name for p in val_preds.glob("*.nii.gz")} == {f"{splits['val'][0]}.nii.gz"}
 
     nnunet.convert(data / "clean", data / "splits.json", tmp_path / "raw", tmp_path / "pre")
     ds = tmp_path / "raw" / nnunet.DATASET_NAME

@@ -57,7 +57,7 @@ def main(argv=None):
     p.add_argument("--data-dir", required=True, help="figo.prepare clean/ folder")
     p.add_argument("--out-dir", required=True)
     p.add_argument("--splits")
-    p.add_argument("--subset", default="test")
+    p.add_argument("--subset", default="val")
     p.add_argument("--cases", nargs="*", help="explicit case ids (overrides --splits)")
     p.add_argument("--tta", action="store_true", help="average over in-plane flips (4x slower)")
     p.add_argument("--overlap", type=float, default=0.5)

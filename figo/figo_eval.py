@@ -141,7 +141,7 @@ def main(argv=None):
     a.add_argument("--ref-dir", required=True, help="clean/ folder with <id>_seg.nii.gz")
     a.add_argument("--pred-dir", required=True, help="folder with <id>.nii.gz predictions")
     a.add_argument("--splits", required=True)
-    a.add_argument("--subset", default="test")
+    a.add_argument("--subset", default="val")
     a.add_argument("--out", required=True)
     args = p.parse_args(argv)
 

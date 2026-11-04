@@ -138,6 +138,7 @@ EPOCHS = 200           # x 250 iterations; set from the smoke-test timing, ident
 MAX_HOURS = 3.5
 PATCH = '192 192 16'   # H W D(slices). On OOM: '160 160 16' or BATCH = 1
 BATCH = 2
+FINAL_TEST = False     # True ONLY for the one final test-set run, after model selection on val
 '''),
     ("code", COMMON_SETUP),
     ("code", '''
@@ -162,16 +163,30 @@ v = [(int(r['epoch']), float(r['val_mean'])) for r in log if r['val_mean']]
 if v: plt.plot(*zip(*v), 'o-', label='val mean Dice')
 plt.legend(); plt.xlabel('epoch'); plt.show()
 '''),
-    ("markdown", "## Test-set inference and evaluation (run after training has finished)"),
+    ("markdown", "## Validation inference and evaluation (for model selection; run after training has finished)"),
     ("code", '''
-PRED = f'{DRIVE}/preds/{MODEL}'
-RES = f'{DRIVE}/results'
+PRED = f'{DRIVE}/preds_val/{MODEL}'
+RES = f'{DRIVE}/results_val'
 !python -m figo.infer --checkpoint {RUN}/best.pt --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
-    --subset test --out-dir {PRED}
+    --subset val --out-dir {PRED}
 !python -m figo.evaluate --pred-dir {PRED} --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
-    --subset test --out {RES}/{MODEL}_seg.csv
+    --subset val --out {RES}/{MODEL}_seg.csv
 !python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {PRED} \\
-    --splits {DRIVE}/data/splits.json --subset test --out {RES}/{MODEL}_figo_agreement.csv
+    --splits {DRIVE}/data/splits.json --subset val --out {RES}/{MODEL}_figo_agreement.csv
+'''),
+    ("markdown", "## Test-set inference and evaluation (final run only: set FINAL_TEST = True and SMOKE = False)"),
+    ("code", '''
+if FINAL_TEST and not SMOKE:
+    PRED = f'{DRIVE}/preds/{MODEL}'
+    RES = f'{DRIVE}/results_test'
+    !python -m figo.infer --checkpoint {RUN}/best.pt --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
+        --subset test --out-dir {PRED}
+    !python -m figo.evaluate --pred-dir {PRED} --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
+        --subset test --out {RES}/{MODEL}_seg.csv
+    !python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {PRED} \\
+        --splits {DRIVE}/data/splits.json --subset test --out {RES}/{MODEL}_figo_agreement.csv
+else:
+    print('Test set skipped: set FINAL_TEST = True (and SMOKE = False) only for the final run.')
 '''),
 ])
 
@@ -190,6 +205,7 @@ ResEnc **M** is used because it fits a 16 GB T4; ResEnc L/XL need 24 GB+.
 VARIANT = '3d_fullres'   # '3d_fullres' (nnU-Net default plans) | 'resenc' (nnUNetResEncUNetMPlans)
 SMOKE = True             # True: 3-epoch timing run into a separate smoke/ folder. False: the real run
 EPOCHS = 250             # set from the smoke-test timing; identical for both variants and across sessions
+FINAL_TEST = False       # True ONLY for the one final test-set run, after model selection on val
 '''),
     ("code", COMMON_SETUP + '''
 !pip -q install 'nnunetv2>=2.5'  # nnUNetTrainer_UMD matches the >=2.5 __init__ signature'''),
@@ -199,11 +215,13 @@ os.environ['nnUNet_raw'] = '/content/nnUNet_raw'
 os.environ['nnUNet_preprocessed'] = '/content/nnUNet_preprocessed'
 os.environ['nnUNet_results'] = f'{DRIVE}/smoke/nnUNet_results' if SMOKE else f'{DRIVE}/nnUNet_results'
 os.environ['UMD_NNUNET_EPOCHS'] = '3' if SMOKE else str(EPOCHS)
+os.environ["nnUNet_n_proc_DA"] = "2"     # Colab has 2 CPUs; avoids data-loader worker crashes
+os.environ["nnUNet_compile"] = "false"   # skip torch.compile
 PLANS = 'nnUNetPlans' if VARIANT == '3d_fullres' else 'nnUNetResEncUNetMPlans'
 PLANNER = [] if VARIANT == '3d_fullres' else ['-pl', 'nnUNetPlannerResEncM']
 
 !python -m figo.nnunet convert --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
-    --nnunet-raw $nnUNet_raw --nnunet-preprocessed $nnUNet_preprocessed
+    --nnunet-raw $$nnUNet_raw --nnunet-preprocessed $$nnUNet_preprocessed
 !python -m figo.nnunet install-trainer
 '''),
     ("code", '''
@@ -234,17 +252,35 @@ print('resuming' if resume else 'starting fresh', fold_dir)
 !nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv
 !nproc
 '''),
-    ("markdown", "## Test-set inference and evaluation (after training)"),
+    ("markdown", '''
+## Validation evaluation (for model selection; after training)
+`nnUNetv2_train` writes the fold-0 validation predictions (`checkpoint_final`) to `fold_0/validation/` when training
+finishes; re-create them with `nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainer_UMD -p {PLANS} --val --npz`.
+'''),
     ("code", '''
 NAME = f'nnunet_{VARIANT}'
-PRED = f'{DRIVE}/preds/{NAME}'
-RES = f'{DRIVE}/results'
-!nnUNetv2_predict -i $nnUNet_raw/Dataset501_UMD/imagesTs -o {PRED} -d 501 -c 3d_fullres -f 0 \\
-    -tr nnUNetTrainer_UMD -p {PLANS} -chk checkpoint_best.pth
-!python -m figo.evaluate --pred-dir {PRED} --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
-    --subset test --out {RES}/{NAME}_seg.csv
-!python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {PRED} \\
-    --splits {DRIVE}/data/splits.json --subset test --out {RES}/{NAME}_figo_agreement.csv
+VAL_PRED = f'{fold_dir}/validation'
+RES = f'{DRIVE}/results_val'
+!python -m figo.evaluate --pred-dir {VAL_PRED} --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
+    --subset val --out {RES}/{NAME}_seg.csv
+!python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {VAL_PRED} \\
+    --splits {DRIVE}/data/splits.json --subset val --out {RES}/{NAME}_figo_agreement.csv
+'''),
+    ("markdown", "## Test-set inference and evaluation (final run only: set FINAL_TEST = True and SMOKE = False)"),
+    ("code", '''
+# checkpoint_final, the same checkpoint that produced the fold_0/validation predictions scored above
+NAME = f'nnunet_{VARIANT}'
+if FINAL_TEST and not SMOKE:
+    PRED = f'{DRIVE}/preds/{NAME}'
+    RES = f'{DRIVE}/results_test'
+    !nnUNetv2_predict -i $$nnUNet_raw/Dataset501_UMD/imagesTs -o {PRED} -d 501 -c 3d_fullres -f 0 \\
+        -tr nnUNetTrainer_UMD -p {PLANS} -chk checkpoint_final.pth
+    !python -m figo.evaluate --pred-dir {PRED} --data-dir {DRIVE}/data/clean --splits {DRIVE}/data/splits.json \\
+        --subset test --out {RES}/{NAME}_seg.csv
+    !python -m figo.figo_eval agreement --ref-dir {DRIVE}/data/clean --pred-dir {PRED} \\
+        --splits {DRIVE}/data/splits.json --subset test --out {RES}/{NAME}_figo_agreement.csv
+else:
+    print('Test set skipped: set FINAL_TEST = True (and SMOKE = False) only for the final run.')
 '''),
 ])
 
@@ -279,29 +315,43 @@ UMD has **no FIGO labels**: the FIGO types below are derived from masks by geome
 (b) each model by how well its masks reproduce the expert-mask FIGO calls. A radiologist spot-check of a
 small subset is still needed before any accuracy claim. Decision support only.
 '''),
+    ("code", '''
+FINAL_TEST = False     # True ONLY for the one final test-set run (steps 2-4), after model selection on val
+'''),
     ("code", COMMON_SETUP),
     ("code", '''
 # 1) rank Stage 1 models on cavity/wall boundary, cavity+wall Dice and downstream FIGO agreement
-!python -m figo.select_models --results-dir {DRIVE}/results
+#    on the VALIDATION set only - never point this at results_test/
+!python -m figo.select_models --results-dir {DRIVE}/results_val
 '''),
     ("code", '''
 # 2) FIGO types from the EXPERT masks on all 300 cases, then compare with published frequencies
-!python -m figo.stage3 --seg-dir {DRIVE}/data/clean --suffix _seg --out {DRIVE}/results/figo_expert_all.csv
-!python -m figo.figo_eval distribution --csv {DRIVE}/results/figo_expert_all.csv
+RES = f'{DRIVE}/results_test'
+if FINAL_TEST:
+    !python -m figo.stage3 --seg-dir {DRIVE}/data/clean --suffix _seg --out {RES}/figo_expert_all.csv
+    !python -m figo.figo_eval distribution --csv {RES}/figo_expert_all.csv
+else:
+    print('Skipped: set FINAL_TEST = True only for the final run.')
 '''),
     ("code", '''
 # 3) FIGO from a selected model's predicted masks (test set) + distribution
 BEST = 'nnunet_resenc'   # set after step 1
-!python -m figo.stage3 --seg-dir {DRIVE}/preds/{BEST} --out {DRIVE}/results/figo_{BEST}_test.csv
-!python -m figo.figo_eval distribution --csv {DRIVE}/results/figo_{BEST}_test.csv
+if FINAL_TEST:
+    !python -m figo.stage3 --seg-dir {DRIVE}/preds/{BEST} --out {RES}/figo_{BEST}_test.csv
+    !python -m figo.figo_eval distribution --csv {RES}/figo_{BEST}_test.csv
+else:
+    print('Skipped: set FINAL_TEST = True only for the final run.')
 '''),
     ("code", '''
 # 4) per-fibroid report with rationale and caution flags (what a radiologist would review)
 import csv
-rows = list(csv.DictReader(open(f'{DRIVE}/results/figo_{BEST}_test.csv')))
-for r in rows[:15]:
-    print(f"{r['case_id']} #{r['fibroid_id']}: FIGO {r['figo']:4s} {r['volume_ml']:>7s} ml  {r['rationale']}"
-          + (f"  [{r['flags']}]" if r['flags'] else ''))
+if FINAL_TEST:
+    rows = list(csv.DictReader(open(f'{RES}/figo_{BEST}_test.csv')))
+    for r in rows[:15]:
+        print(f"{r['case_id']} #{r['fibroid_id']}: FIGO {r['figo']:4s} {r['volume_ml']:>7s} ml  {r['rationale']}"
+              + (f"  [{r['flags']}]" if r['flags'] else ''))
+else:
+    print('Skipped: set FINAL_TEST = True only for the final run.')
 '''),
 ])
 
@@ -326,6 +376,7 @@ EPOCHS = 200           # must equal the Colab custom models' EPOCHS
 MAX_HOURS = 11.0       # Kaggle stops sessions at 12 h; leave time to save outputs
 PATCH = '192 192 16'
 BATCH = 2
+FINAL_TEST = False     # True ONLY for the one final test-set run, after model selection on val
 '''),
     ("code", '''
 import glob, os, shutil, subprocess, zipfile
@@ -377,19 +428,31 @@ if prev and not os.path.exists(f'{RUN}/last.pt'):
     --epochs {EPOCHS} --max-hours {MAX_HOURS} --patch-size {PATCH} --batch-size {BATCH} --workers 3
 '''),
     ("code", TIMING),
-    ("markdown", "## Test-set inference and evaluation (in the run where training finishes)"),
+    ("markdown", "## Validation inference and evaluation (in the run where training finishes)"),
     ("code", '''
 import json
 done = torch.load(f'{RUN}/last.pt', map_location='cpu', weights_only=False)['epoch'] + 1 >= EPOCHS
 if done and not SMOKE:
-    PRED, RES = f'{OUT}/preds/{MODEL}', f'{OUT}/results'
+    PRED, RES = f'{OUT}/preds_val/{MODEL}', f'{OUT}/results_val'
+    !python -m figo.infer --checkpoint {RUN}/best.pt --data-dir {CLEAN} --splits {SPLITS} --subset val --out-dir {PRED}
+    !python -m figo.evaluate --pred-dir {PRED} --data-dir {CLEAN} --splits {SPLITS} --subset val --out {RES}/{MODEL}_seg.csv
+    !python -m figo.figo_eval agreement --ref-dir {CLEAN} --pred-dir {PRED} --splits {SPLITS} --subset val \\
+        --out {RES}/{MODEL}_figo_agreement.csv
+    print("Download this version's output and copy preds_val/ and results_val/ into MyDrive/figo/ for model selection.")
+else:
+    print('Training not finished yet - attach this output as input and Save & Run All again.')
+'''),
+    ("markdown", "## Test-set inference and evaluation (final run only: set FINAL_TEST = True and SMOKE = False)"),
+    ("code", '''
+if done and FINAL_TEST and not SMOKE:
+    PRED, RES = f'{OUT}/preds/{MODEL}', f'{OUT}/results_test'
     !python -m figo.infer --checkpoint {RUN}/best.pt --data-dir {CLEAN} --splits {SPLITS} --subset test --out-dir {PRED}
     !python -m figo.evaluate --pred-dir {PRED} --data-dir {CLEAN} --splits {SPLITS} --subset test --out {RES}/{MODEL}_seg.csv
     !python -m figo.figo_eval agreement --ref-dir {CLEAN} --pred-dir {PRED} --splits {SPLITS} --subset test \\
         --out {RES}/{MODEL}_figo_agreement.csv
-    print("Download this version's output and copy preds/ and results/ into MyDrive/figo/ for model selection.")
+    print("Download this version's output and copy preds/ and results_test/ into MyDrive/figo/.")
 else:
-    print('Training not finished yet - attach this output as input and Save & Run All again.')
+    print('Test set skipped: set FINAL_TEST = True (and SMOKE = False) only for the final run.')
 '''),
 ])
 

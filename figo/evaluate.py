@@ -55,7 +55,7 @@ def main(argv=None):
     p.add_argument("--pred-dir", required=True)
     p.add_argument("--data-dir", required=True, help="figo.prepare clean/ folder")
     p.add_argument("--splits")
-    p.add_argument("--subset", default="test")
+    p.add_argument("--subset", default="val")
     p.add_argument("--out", required=True, help="per-case CSV; a <out>.summary.json is written next to it")
     args = p.parse_args(argv)
 
